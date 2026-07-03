@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Draftech International — One Partner. Every Phase.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  /* ============ Brand tokens (pulled from draftech.com) ============ */
+  :root{
+    --bg:#080810;
+    --bg-2:#0c0e18;
+    --bg-3:#12141a;
+    --surface:#1a1c22;
+    --line:#2a2c32;
+    --text:#e8e8ec;
+    --muted:#b0b8c8;
+    --dim:#5a5a66;
+    --cyan:#00bcd4;
+    --cyan-bright:#00e5ff;
+    --cyan-deep:#009aad;
+    --font:'Montserrat',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --z-nav:100;
+    --z-hud:40;
+    --z-loader:1000;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:auto}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font);
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    overflow-x:hidden;
+  }
+  a{color:inherit;text-decoration:none}
+  ::selection{background:var(--cyan);color:#03121a}
+
+  /* ============ Loader ============ */
+  #loader{
+    position:fixed;inset:0;z-index:var(--z-loader);
+    background:radial-gradient(120% 120% at 50% 40%,#0c0e18 0%,#050509 70%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;
+    transition:opacity .6s ease,visibility .6s ease;
+  }
+  #loader.done{opacity:0;visibility:hidden;pointer-events:none}
+  #loader .mark{
+    font-weight:800;letter-spacing:.32em;font-size:13px;color:var(--muted);
+    text-transform:uppercase;
+  }
+  #loader .mark b{color:var(--cyan-bright);font-weight:800}
+  .bar{width:min(320px,64vw);height:2px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
+  .bar>i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),var(--cyan-bright));box-shadow:0 0 14px var(--cyan);transition:width .18s ease}
+  #loadPct{font-size:11px;letter-spacing:.28em;color:var(--dim);font-variant-numeric:tabular-nums}
+
+  /* ============ Top nav ============ */
+  header{
+    position:fixed;top:0;left:0;right:0;z-index:var(--z-nav);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px clamp(18px,4vw,44px);
+    background:linear-gradient(180deg,rgba(8,8,16,.82) 0%,rgba(8,8,16,0) 100%);
+    backdrop-filter:blur(2px);
+    transition:background .4s ease,backdrop-filter .4s ease,border-color .4s ease;
+    border-bottom:1px solid transparent;
+  }
+  header.solid{
+    background:rgba(8,8,16,.9);
+    backdrop-filter:blur(14px) saturate(140%);
+    border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand img{height:30px;width:auto;display:block}
+  .brand .wm{display:flex;flex-direction:column;line-height:1}
+  .brand .wm b{font-weight:800;letter-spacing:.14em;font-size:15px}
+  .brand .wm span{font-weight:600;letter-spacing:.34em;font-size:8.5px;color:var(--cyan);margin-top:4px}
+  nav{display:flex;align-items:center;gap:clamp(14px,1.6vw,26px)}
+  nav .lnk{font-size:11.5px;font-weight:600;letter-spacing:.14em;color:var(--muted);transition:color .2s ease;position:relative;padding:6px 0}
+  nav .lnk:hover,nav .lnk:focus-visible{color:var(--text);outline:none}
+  nav .lnk::after{content:"";position:absolute;left:0;right:100%;bottom:0;height:1.5px;background:var(--cyan-bright);transition:right .25s ease}
+  nav .lnk:hover::after,nav .lnk:focus-visible::after{right:0}
+  .cta{
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:11.5px;font-weight:700;letter-spacing:.14em;
+    color:#03121a;background:linear-gradient(180deg,var(--cyan-bright),var(--cyan));
+    padding:11px 18px;border-radius:2px;
+    box-shadow:0 4px 18px rgba(0,188,212,.35);
+    transition:transform .18s ease,box-shadow .18s ease,filter .18s ease;
+  }
+  .cta:hover,.cta:focus-visible{transform:translateY(-1px);filter:brightness(1.06);box-shadow:0 6px 24px rgba(0,229,255,.5);outline:none}
+  .cta:active{transform:translateY(0)}
+  .navtoggle{display:none;background:none;border:1px solid var(--line);color:var(--text);border-radius:3px;padding:8px 10px;font-size:12px}
+
+  /* ============ Scroll hero (pinned canvas) ============ */
+  #hero{position:relative;height:560vh}
+  .pin{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden;background:#04040a}
+  #film{position:absolute;inset:0;width:100%;height:100%;display:block}
+  /* cinematic grade over the footage */
+  .grade{position:absolute;inset:0;pointer-events:none;
+    background:
+      radial-gradient(120% 90% at 50% 42%,rgba(8,8,16,0) 40%,rgba(6,6,12,.72) 100%),
+      linear-gradient(180deg,rgba(8,8,16,.55) 0%,rgba(8,8,16,0) 22%,rgba(8,8,16,0) 60%,rgba(8,8,16,.78) 100%);
+  }
+  .scanline{position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background:repeating-linear-gradient(180deg,rgba(0,229,255,.03) 0px,rgba(0,229,255,.03) 1px,transparent 1px,transparent 3px);
+    mix-blend-mode:screen;}
+
+  /* HUD frame corners — engineering / surveying feel */
+  .hud{position:absolute;inset:clamp(16px,3vw,40px);pointer-events:none;z-index:var(--z-hud)}
+  .hud .corner{position:absolute;width:26px;height:26px;border:2px solid rgba(0,229,255,.55)}
+  .hud .tl{top:0;left:0;border-right:0;border-bottom:0}
+  .hud .tr{top:0;right:0;border-left:0;border-bottom:0}
+  .hud .bl{bottom:0;left:0;border-right:0;border-top:0}
+  .hud .br{bottom:0;right:0;border-left:0;border-top:0}
+  .hud .tag{position:absolute;top:2px;left:38px;font-size:9.5px;letter-spacing:.34em;color:rgba(0,229,255,.75);font-weight:600}
+  .hud .frameno{position:absolute;bottom:2px;right:2px;font-size:9.5px;letter-spacing:.28em;color:rgba(176,184,200,.7);font-variant-numeric:tabular-nums;font-weight:600}
+
+  /* scene captions synced to scroll */
+  .scenes{position:absolute;inset:0;z-index:var(--z-hud);pointer-events:none}
+  .scene{position:absolute;left:0;right:0;bottom:clamp(74px,13vh,150px);
+    padding:0 clamp(22px,6vw,90px);
+    display:flex;flex-direction:column;gap:14px;
+    opacity:0;transform:translateY(26px);will-change:opacity,transform}
+  .scene .kicker{display:inline-flex;align-items:center;gap:10px;font-size:11px;font-weight:700;letter-spacing:.3em;color:var(--cyan-bright);text-transform:uppercase}
+  .scene .kicker::before{content:"";width:34px;height:2px;background:var(--cyan-bright);box-shadow:0 0 10px var(--cyan)}
+  .scene h2{font-size:clamp(30px,6.2vw,74px);font-weight:800;line-height:.98;letter-spacing:-.01em;max-width:16ch;
+    text-shadow:0 4px 30px rgba(0,0,0,.6)}
+  .scene h2 em{font-style:normal;color:var(--cyan-bright)}
+  .scene p{font-size:clamp(14px,1.5vw,18px);font-weight:500;color:var(--muted);max-width:56ch;line-height:1.6}
+
+  /* fixed hero headline (top) that fades as you enter the scenes */
+  .herohead{position:absolute;top:clamp(90px,15vh,150px);left:0;right:0;z-index:var(--z-hud);
+    padding:0 clamp(22px,6vw,90px);text-align:left;will-change:opacity,transform}
+  .herohead .super{font-size:11px;font-weight:700;letter-spacing:.4em;color:var(--cyan);text-transform:uppercase;margin-bottom:16px}
+  .herohead h1{font-size:clamp(34px,7vw,86px);font-weight:900;line-height:.95;letter-spacing:-.015em;max-width:15ch}
+  .herohead h1 em{font-style:normal;color:var(--cyan-bright)}
+  .herohead .sub{margin-top:20px;font-size:clamp(14px,1.6vw,19px);color:var(--muted);max-width:52ch;line-height:1.6;font-weight:500}
+
+  /* scroll cue */
+  .cue{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);z-index:var(--z-hud);
+    display:flex;flex-direction:column;align-items:center;gap:9px;color:var(--muted);
+    font-size:10px;letter-spacing:.32em;font-weight:600;transition:opacity .4s ease}
+  .cue .mouse{width:22px;height:34px;border:2px solid rgba(176,184,200,.6);border-radius:12px;position:relative}
+  .cue .mouse::before{content:"";position:absolute;left:50%;top:6px;width:3px;height:7px;background:var(--cyan-bright);border-radius:2px;transform:translateX(-50%);animation:wheel 1.6s ease-in-out infinite}
+  @keyframes wheel{0%{opacity:0;transform:translate(-50%,0)}30%{opacity:1}60%{opacity:1}100%{opacity:0;transform:translate(-50%,10px)}}
+
+  /* progress rail (scrub position through the film) */
+  .rail{position:absolute;right:clamp(16px,3vw,40px);top:50%;transform:translateY(-50%);z-index:var(--z-hud);
+    height:min(240px,34vh);width:2px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden}
+  .rail>i{display:block;width:100%;height:0%;background:linear-gradient(180deg,var(--cyan-bright),var(--cyan-deep));box-shadow:0 0 12px var(--cyan)}
+
+  /* top scroll progress bar */
+  #topbar{position:fixed;top:0;left:0;height:2px;width:0%;z-index:calc(var(--z-nav) + 1);
+    background:linear-gradient(90deg,var(--cyan),var(--cyan-bright));box-shadow:0 0 10px var(--cyan)}
+
+  /* ============ Content below hero ============ */
+  section.block{position:relative;padding:clamp(80px,12vh,160px) clamp(22px,6vw,90px);background:var(--bg)}
+  .intro{max-width:1200px;margin:0 auto}
+  .intro .kicker{font-size:11px;font-weight:700;letter-spacing:.3em;color:var(--cyan);text-transform:uppercase;display:flex;align-items:center;gap:10px}
+  .intro .kicker::before{content:"";width:34px;height:2px;background:var(--cyan)}
+  .intro h2{font-size:clamp(28px,4.4vw,54px);font-weight:800;line-height:1.05;letter-spacing:-.01em;margin:22px 0 0;max-width:20ch}
+  .intro h2 em{font-style:normal;color:var(--cyan-bright)}
+  .intro p{margin-top:22px;font-size:clamp(15px,1.5vw,18px);color:var(--muted);max-width:60ch;line-height:1.7;font-weight:500}
+
+  .grid{max-width:1200px;margin:56px auto 0;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{background:linear-gradient(180deg,var(--bg-3),var(--bg-2));border:1px solid var(--line);border-radius:6px;
+    padding:30px 26px;transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease;position:relative;overflow:hidden}
+  .card::after{content:"";position:absolute;left:0;top:0;height:2px;width:0;background:linear-gradient(90deg,var(--cyan),var(--cyan-bright));transition:width .35s ease}
+  .card:hover{transform:translateY(-4px);border-color:rgba(0,188,212,.5);box-shadow:0 18px 40px rgba(0,0,0,.4)}
+  .card:hover::after{width:100%}
+  .card .ic{width:42px;height:42px;border-radius:5px;display:grid;place-items:center;background:rgba(0,188,212,.1);border:1px solid rgba(0,188,212,.3);margin-bottom:20px}
+  .card .ic svg{width:22px;height:22px;stroke:var(--cyan-bright);fill:none;stroke-width:1.6}
+  .card h3{font-size:17px;font-weight:700;letter-spacing:.01em}
+  .card p{margin-top:10px;font-size:13.5px;color:var(--muted);line-height:1.65;font-weight:500}
+  .card .no{position:absolute;top:22px;right:24px;font-size:12px;font-weight:700;color:var(--dim);letter-spacing:.1em;font-variant-numeric:tabular-nums}
+
+  /* stat strip */
+  .stats{max-width:1200px;margin:64px auto 0;display:grid;grid-template-columns:repeat(4,1fr);gap:18px;
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:40px 0}
+  .stat b{display:block;font-size:clamp(30px,4vw,46px);font-weight:800;color:var(--cyan-bright);line-height:1;font-variant-numeric:tabular-nums}
+  .stat span{display:block;margin-top:10px;font-size:11.5px;letter-spacing:.14em;color:var(--muted);font-weight:600;text-transform:uppercase}
+
+  /* CTA band */
+  .cband{position:relative;text-align:center;padding:clamp(80px,12vh,150px) clamp(22px,6vw,90px);
+    background:radial-gradient(120% 140% at 50% 0%,rgba(0,188,212,.12) 0%,rgba(8,8,16,0) 55%),var(--bg-2);
+    border-top:1px solid var(--line)}
+  .cband h2{font-size:clamp(30px,5vw,60px);font-weight:900;letter-spacing:-.01em;line-height:1;max-width:18ch;margin:0 auto}
+  .cband h2 em{font-style:normal;color:var(--cyan-bright)}
+  .cband p{margin:22px auto 0;color:var(--muted);max-width:52ch;font-size:16px;line-height:1.6;font-weight:500}
+  .cband .big{display:inline-flex;align-items:center;gap:10px;margin-top:34px;font-size:13px;font-weight:800;letter-spacing:.16em;
+    color:#03121a;background:linear-gradient(180deg,var(--cyan-bright),var(--cyan));padding:16px 30px;border-radius:3px;
+    box-shadow:0 8px 30px rgba(0,188,212,.4);transition:transform .18s ease,box-shadow .18s ease,filter .18s ease}
+  .cband .big:hover,.cband .big:focus-visible{transform:translateY(-2px);filter:brightness(1.05);box-shadow:0 12px 40px rgba(0,229,255,.55);outline:none}
+
+  /* footer */
+  footer{background:var(--bg);border-top:1px solid var(--line);padding:48px clamp(22px,6vw,90px)}
+  .foot{max-width:1200px;margin:0 auto;display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between}
+  .foot .l{display:flex;align-items:center;gap:12px}
+  .foot .l img{height:26px}
+  .foot .l div b{font-weight:800;letter-spacing:.14em;font-size:14px;display:block}
+  .foot .l div span{font-size:9px;letter-spacing:.3em;color:var(--cyan);font-weight:600}
+  .foot .meta{font-size:12px;color:var(--dim);line-height:1.7}
+  .foot .meta a{color:var(--muted)}
+  .foot .meta a:hover{color:var(--cyan-bright)}
+
+  /* ============ Responsive ============ */
+  @media (max-width:1024px){
+    nav .lnk:nth-child(n+5){display:none}
+    .grid{grid-template-columns:repeat(2,1fr)}
+    .stats{grid-template-columns:repeat(2,1fr);gap:28px}
+  }
+  @media (max-width:720px){
+    nav{display:none}
+    nav.open{display:flex;position:absolute;top:100%;right:12px;flex-direction:column;align-items:flex-start;
+      background:rgba(10,10,18,.98);border:1px solid var(--line);border-radius:6px;padding:16px 20px;gap:14px;backdrop-filter:blur(14px)}
+    nav.open .lnk{display:block!important;font-size:13px}
+    nav.open .cta{margin-top:6px}
+    .navtoggle{display:inline-block}
+    .brand .wm b{font-size:13px}
+    .grid{grid-template-columns:1fr}
+    .rail{display:none}
+    .hud .tag{font-size:8px}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .cue .mouse::before{animation:none}
+    .scene,.herohead{transition:none!important}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Loader ===== -->
+<div id="loader" role="status" aria-live="polite">
+  <div class="mark">DRAFTECH <b>INTERNATIONAL</b></div>
+  <div class="bar"><i id="loadFill"></i></div>
+  <div id="loadPct">BUFFERING FIELD DATA · 0%</div>
+</div>
+
+<div id="topbar"></div>
+
+<!-- ===== Nav ===== -->
+<header id="nav">
+  <a class="brand" href="#top" aria-label="Draftech International home">
+    <img src="logo.webp" alt="Draftech International logo" onerror="this.style.display='none'"/>
+    <span class="wm"><b>DRAFTECH</b><span>INTERNATIONAL</span></span>
+  </a>
+  <button class="navtoggle" id="navtoggle" aria-label="Toggle menu" aria-expanded="false">MENU</button>
+  <nav id="navmenu">
+    <a class="lnk" href="#top">HOME</a>
+    <a class="lnk" href="#services">SERVICES</a>
+    <a class="lnk" href="#about">ABOUT</a>
+    <a class="lnk" href="#">BLOG</a>
+    <a class="lnk" href="#">SERVICE AREAS</a>
+    <a class="lnk" href="#">VENDORS</a>
+    <a class="lnk" href="#">CAREERS</a>
+    <a class="cta" href="#contact">LET'S BUILD →</a>
+  </nav>
+</header>
+
+<!-- ===== Scroll-scrub hero ===== -->
+<main id="top">
+<section id="hero" aria-label="Draftech end-to-end OSP engineering, from survey to as-built">
+  <div class="pin">
+    <canvas id="film" aria-hidden="true"></canvas>
+    <div class="grade"></div>
+    <div class="scanline"></div>
+
+    <div class="hud" aria-hidden="true">
+      <span class="corner tl"></span><span class="corner tr"></span>
+      <span class="corner bl"></span><span class="corner br"></span>
+      <span class="tag">OSP · FIELD-TO-ASBUILT</span>
+      <span class="frameno" id="frameno">FRAME 001 / 121</span>
+    </div>
+
+    <!-- opening headline -->
+    <div class="herohead" id="herohead">
+      <div class="super">END-TO-END OSP ENGINEERING</div>
+      <h1>One&nbsp;Partner.<br><em>Every&nbsp;Phase.</em></h1>
+      <p class="sub">From the first field survey to the final as-built — copper, fiber, coaxial &amp; HFC, engineered across all 50 states. <strong>Scroll to follow the route.</strong></p>
+    </div>
+
+    <!-- scroll-synced scenes -->
+    <div class="scenes">
+      <article class="scene" data-scene="0">
+        <span class="kicker">01 — Survey &amp; Design</span>
+        <h2>It starts on the <em>plan.</em></h2>
+        <p>Field survey and OSP engineering translate the ground into a precise, permit-ready route — aerial imagery, alignments, and stationing, drawn once and drawn right.</p>
+      </article>
+      <article class="scene" data-scene="1">
+        <span class="kicker">02 — Route &amp; Network Design</span>
+        <h2>Every route, <em>engineered.</em></h2>
+        <p>Fiber, copper, coax and HFC alignments laid down mile by mile — validated against the real corridor before a single crew mobilizes.</p>
+      </article>
+      <article class="scene" data-scene="2">
+        <span class="kicker">03 — Permit &amp; Build</span>
+        <h2>Then we <em>build it.</em></h2>
+        <p>Directional drilling, placement and as-built documentation close the loop. Permitting to final record — one accountable partner, every phase.</p>
+      </article>
+    </div>
+
+    <div class="rail" aria-hidden="true"><i id="railFill"></i></div>
+    <div class="cue" id="cue"><div class="mouse"></div>SCROLL</div>
+  </div>
+</section>
+
+<!-- ===== Services ===== -->
+<section class="block" id="services">
+  <div class="intro" id="about">
+    <div class="kicker">WHAT WE DELIVER</div>
+    <h2>The entire outside-plant lifecycle, under <em>one roof.</em></h2>
+    <p>Draftech International is a full-service OSP engineering partner — from initial field data collection to final as-built documentation. No hand-offs, no gaps, no finger-pointing.</p>
+  </div>
+
+  <div class="grid">
+    <article class="card"><span class="no">01</span>
+      <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6z"/><path d="M9 3v15M15 6v15"/></svg></div>
+      <h3>Field Survey &amp; Data Collection</h3>
+      <p>Boots-on-the-ground survey, pole and pathway data, and photo capture that anchors every downstream design to reality.</p>
+    </article>
+    <article class="card"><span class="no">02</span>
+      <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 20V6a2 2 0 012-2h9l5 5v11"/><path d="M8 12h8M8 16h5"/></svg></div>
+      <h3>OSP Engineering</h3>
+      <p>Aerial and underground outside-plant design engineered to spec, code, and carrier standards — permit-ready the first time.</p>
+    </article>
+    <article class="card"><span class="no">03</span>
+      <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/></svg></div>
+      <h3>Fiber Network Design</h3>
+      <p>FTTx, backbone and distribution design — splice plans, fiber management and route optimization built for scale.</p>
+    </article>
+    <article class="card"><span class="no">04</span>
+      <div class="ic"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+      <h3>Permitting &amp; Regulatory</h3>
+      <p>Municipal, DOT and railroad permitting managed end-to-end so the route stays legal and on schedule.</p>
+    </article>
+    <article class="card"><span class="no">05</span>
+      <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 3h18v14H3z"/><path d="M3 8h18M8 3v14M3 21h18"/></svg></div>
+      <h3>CAD / GIS &amp; Documentation</h3>
+      <p>Drafting, GIS integration and precise as-built records — the single source of truth for what got built.</p>
+    </article>
+    <article class="card"><span class="no">06</span>
+      <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 20v-8"/><circle cx="12" cy="7" r="3"/><path d="M5 20a7 7 0 0114 0M2 12a10 10 0 015-3M22 12a10 10 0 00-5-3"/></svg></div>
+      <h3>Wireless Engineering</h3>
+      <p>Small-cell and wireless site design that ties the fixed network to the air — one partner across every layer.</p>
+    </article>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b>50</b><span>U.S. States Served</span></div>
+    <div class="stat"><b>4</b><span>Copper · Fiber · Coax · HFC</span></div>
+    <div class="stat"><b>1</b><span>Accountable Partner</span></div>
+    <div class="stat"><b>∞</b><span>Field-to-As-Built Loop</span></div>
+  </div>
+</section>
+
+<!-- ===== CTA ===== -->
+<section class="cband" id="contact">
+  <h2>Ready to engineer your <em>next mile?</em></h2>
+  <p>From survey to as-built, Draftech International is the one partner that carries your OSP project across every phase.</p>
+  <a class="big" href="mailto:info@draftech.com">LET'S BUILD →</a>
+</section>
+</main>
+
+<!-- ===== Footer ===== -->
+<footer>
+  <div class="foot">
+    <div class="l">
+      <img src="logo.webp" alt="Draftech International logo" onerror="this.style.display='none'"/>
+      <div><b>DRAFTECH</b><span>INTERNATIONAL</span></div>
+    </div>
+    <div class="meta">
+      <div>End-to-End OSP Engineering · One Partner. Every Phase.</div>
+      <div><a href="mailto:info@draftech.com">info@draftech.com</a> · MBE Certified · Serving all 50 U.S. states</div>
+      <div>© 2026 Draftech International. Concept hero built for demonstration.</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var TOTAL = 121;
+  var PAD = 4;
+  var DIR = "frames/";
+  var PREFIX = "frame_";
+  var EXT = ".jpg";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---------- Preload ----------
+  var images = new Array(TOTAL);
+  var loaded = 0;
+  var fill = document.getElementById("loadFill");
+  var pct = document.getElementById("loadPct");
+  var loader = document.getElementById("loader");
+  var started = false;
+
+  function pathFor(i){
+    var n = String(i+1);
+    while(n.length < PAD) n = "0"+n;
+    return DIR + PREFIX + n + EXT;
+  }
+  function onOne(){
+    loaded++;
+    var p = Math.round(loaded/TOTAL*100);
+    fill.style.width = p + "%";
+    pct.textContent = "BUFFERING FIELD DATA · " + p + "%";
+    if(!started && (images[0] && images[0].complete)){ started = true; requestAnimationFrame(render); }
+    if(loaded >= TOTAL){ finish(); }
+  }
+  function finish(){
+    loader.classList.add("done");
+    // ensure a frame is painted
+    requestAnimationFrame(render);
+  }
+  for(var i=0;i<TOTAL;i++){
+    var img = new Image();
+    img.onload = onOne;
+    img.onerror = onOne; // don't stall the loader on a missing frame
+    img.src = pathFor(i);
+    images[i] = img;
+  }
+  // safety: never trap the user behind the loader
+  setTimeout(function(){ if(!loader.classList.contains("done")) loader.classList.add("done"); }, 9000);
+
+  // ---------- Canvas ----------
+  var canvas = document.getElementById("film");
+  var ctx = canvas.getContext("2d", { alpha:false });
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var cw=0, ch=0;
+
+  function resize(){
+    var r = canvas.getBoundingClientRect();
+    cw = r.width; ch = r.height;
+    canvas.width = Math.round(cw*dpr);
+    canvas.height = Math.round(ch*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    drawFrame(currentIndex, true);
+  }
+
+  function drawCover(img){
+    if(!img || !img.naturalWidth) return;
+    var iw = img.naturalWidth, ih = img.naturalHeight;
+    var scale = Math.max(cw/iw, ch/ih);
+    var w = iw*scale, h = ih*scale;
+    var x = (cw - w)/2, y = (ch - h)/2;
+    ctx.fillStyle = "#04040a";
+    ctx.fillRect(0,0,cw,ch);
+    ctx.drawImage(img, x, y, w, h);
+  }
+
+  var lastDrawn = -1;
+  function drawFrame(idx, force){
+    idx = Math.max(0, Math.min(TOTAL-1, idx|0));
+    if(idx === lastDrawn && !force) return;
+    var img = images[idx];
+    if(img && img.complete && img.naturalWidth){
+      drawCover(img);
+      lastDrawn = idx;
+    } else if(force){
+      // find nearest loaded frame so we never show black
+      for(var d=1; d<TOTAL; d++){
+        var a=images[idx-d], b=images[idx+d];
+        if(a && a.complete && a.naturalWidth){ drawCover(a); break; }
+        if(b && b.complete && b.naturalWidth){ drawCover(b); break; }
+      }
+    }
+    var fn = document.getElementById("frameno");
+    if(fn) fn.textContent = "FRAME " + String(idx+1).padStart(3,"0") + " / " + TOTAL;
+  }
+
+  // ---------- Scroll → frame ----------
+  var hero = document.getElementById("hero");
+  var targetIndex = 0;
+  var currentIndex = 0;
+  var progress = 0; // 0..1 through the hero scrub
+
+  function computeProgress(){
+    var rect = hero.getBoundingClientRect();
+    var scrollable = hero.offsetHeight - window.innerHeight;
+    var passed = -rect.top;
+    var p = scrollable > 0 ? passed/scrollable : 0;
+    return Math.max(0, Math.min(1, p));
+  }
+
+  function smoothstep(e0,e1,x){
+    var t = Math.max(0, Math.min(1, (x-e0)/(e1-e0)));
+    return t*t*(3-2*t);
+  }
+
+  var scenes = Array.prototype.slice.call(document.querySelectorAll(".scene"));
+  var herohead = document.getElementById("herohead");
+  var railFill = document.getElementById("railFill");
+  var cue = document.getElementById("cue");
+  var topbar = document.getElementById("topbar");
+  var navEl = document.getElementById("nav");
+
+  // scene visibility windows (in hero progress space)
+  var windows = [ [0.14,0.36], [0.44,0.66], [0.74,0.97] ];
+
+  function updateHud(){
+    // opening headline fades out early
+    var headOut = smoothstep(0.05, 0.16, progress);
+    herohead.style.opacity = (1 - headOut);
+    herohead.style.transform = "translateY(" + (-30*headOut) + "px)";
+
+    for(var i=0;i<scenes.length;i++){
+      var w = windows[i];
+      var mid = (w[0]+w[1])/2;
+      var half = (w[1]-w[0])/2;
+      // fade in over first 45%, hold, fade out over last 45%
+      var inA = smoothstep(w[0], w[0]+half*0.9, progress);
+      var outA = 1 - smoothstep(w[1]-half*0.9, w[1], progress);
+      var a = Math.min(inA, outA);
+      scenes[i].style.opacity = a;
+      scenes[i].style.transform = "translateY(" + ((1-a)*26) + "px)";
+    }
+
+    railFill.style.height = (progress*100) + "%";
+    if(cue) cue.style.opacity = (1 - smoothstep(0.02, 0.12, progress));
+
+    // whole-page top bar
+    var doc = document.documentElement;
+    var full = (doc.scrollHeight - window.innerHeight);
+    topbar.style.width = (full>0 ? (window.scrollY/full*100) : 0) + "%";
+    if(window.scrollY > 30) navEl.classList.add("solid"); else navEl.classList.remove("solid");
+  }
+
+  function onScroll(){
+    progress = computeProgress();
+    targetIndex = progress * (TOTAL-1);
+    updateHud();
+    if(reduce){ currentIndex = targetIndex; drawFrame(Math.round(currentIndex)); }
+  }
+
+  // rAF render loop with easing toward target (smooth scrub)
+  function render(){
+    if(!reduce){
+      currentIndex += (targetIndex - currentIndex) * 0.18;
+      if(Math.abs(targetIndex - currentIndex) < 0.01) currentIndex = targetIndex;
+      drawFrame(Math.round(currentIndex));
+    }
+    requestAnimationFrame(render);
+  }
+
+  // ---------- Wire up ----------
+  window.addEventListener("scroll", onScroll, {passive:true});
+  window.addEventListener("resize", function(){ dpr=Math.min(window.devicePixelRatio||1,2); resize(); onScroll(); });
+  resize();
+  onScroll();
+  if(reduce){ drawFrame(0, true); }
+
+  // mobile menu
+  var tog = document.getElementById("navtoggle");
+  var menu = document.getElementById("navmenu");
+  if(tog){
+    tog.addEventListener("click", function(){
+      var open = menu.classList.toggle("open");
+      tog.setAttribute("aria-expanded", open ? "true":"false");
+    });
+    menu.addEventListener("click", function(e){ if(e.target.classList.contains("lnk")) { menu.classList.remove("open"); tog.setAttribute("aria-expanded","false"); }});
+  }
+})();
+</script>
+</body>
+</html>
