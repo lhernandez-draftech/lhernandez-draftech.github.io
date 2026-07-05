@@ -200,9 +200,9 @@
       <article class="card"><span class="no">01</span><h3>Field Survey &amp; Data Collection</h3><p>Total station, GNSS rover and field data that anchor every downstream design to the real right-of-way.</p></article>
       <article class="card"><span class="no">02</span><h3>Fiber Network Design</h3><p>FTTH/FTTx backbone, laterals and distribution — HLD/LLD, BEAD engineering and route optimization.</p></article>
       <article class="card"><span class="no">03</span><h3>OSP Engineering</h3><p>Make-ready, pole loading, splice design — aerial and underground plant engineered to carrier spec and code.</p></article>
-      <article class="card"><span class="no">04</span><h3>CAD / GIS &amp; As-Built</h3><p>AutoCAD, ArcGIS and 3GIS documentation — one authoritative record of what's in the ground and on the pole.</p></article>
+      <article class="card"><span class="no">04</span><h3>Permitting &amp; Regulatory</h3><p>Pole attachment applications, ROW permits, DOT/municipal and MOT — the route is legal before it's built.</p></article>
       <article class="card"><span class="no">05</span><h3>Wireless Engineering</h3><p>Small cell, DAS and tower structural (TIA-222) — where the fixed network meets the air.</p></article>
-      <article class="card"><span class="no">06</span><h3>Permitting &amp; Regulatory</h3><p>Pole attachment applications, ROW permits, DOT/municipal and MOT — the route stays legal and on schedule.</p></article>
+      <article class="card"><span class="no">06</span><h3>CAD / GIS &amp; As-Built</h3><p>AutoCAD, ArcGIS and 3GIS documentation — one authoritative record of what's in the ground and on the pole.</p></article>
     </div>
     <div class="stats">
       <div class="stat"><b>44,000+</b><span>Miles delivered</span></div>
@@ -265,13 +265,13 @@ const isMobile=Math.min(innerWidth,innerHeight)<640;
 const renderer=new THREE.WebGLRenderer({canvas, antialias:false, powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1, isMobile?1.5:2));
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.14;
+renderer.toneMappingExposure=1.24;
 renderer.shadowMap.enabled=!isMobile;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 
 const scene=new THREE.Scene();
-scene.fog=new THREE.FogExp2(0x0d0e15, .0092);
-const camera=new THREE.PerspectiveCamera(46,1,.05,900);
+scene.fog=new THREE.FogExp2(0x0a0d13, .0095);
+const camera=new THREE.PerspectiveCamera(34,1,.05,900);   /* longer lens — compressed, professional */
 
 const rtOpts={samples:isMobile?0:4, type:THREE.HalfFloatType};
 const composer=new EffectComposer(renderer, new THREE.WebGLRenderTarget(8,8,rtOpts));
@@ -500,41 +500,41 @@ const tuftTex=ctex(256,256,(x,w,h)=>{
     x.quadraticCurveTo(bx+(Math.random()-.5)*36, h*.5, bx+(Math.random()-.5)*70, h*(.04+Math.random()*.3)); x.stroke(); }
 },{clamp:true});
 
-/* ---- warm light pool decal ---- */
+/* ---- streetlight pool decal — neutral 4000K LED white ---- */
 const poolTex=ctex(512,512,(x,w,h)=>{
   const g=x.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);
-  g.addColorStop(0,'rgba(255,190,120,.55)'); g.addColorStop(.5,'rgba(255,170,90,.18)'); g.addColorStop(1,'rgba(255,160,80,0)');
+  g.addColorStop(0,'rgba(235,240,244,.5)'); g.addColorStop(.5,'rgba(220,228,236,.16)'); g.addColorStop(1,'rgba(210,220,232,0)');
   x.fillStyle=g; x.fillRect(0,0,w,h);
 },{clamp:true});
 
 /* ================= sky ================= */
 {
   const sky=ctex(2048,1024,(x,w,h)=>{
-    /* NOTE: sphere v=0 zenith, v=.5 HORIZON, v=1 nadir — warm band must sit just above .5 */
+    /* BLUE-HOUR OVERCAST — professional engineering-film grade. Sphere v=.5 is the horizon. */
     const g=x.createLinearGradient(0,0,0,h);
-    g.addColorStop(0,'#060a18');  g.addColorStop(.26,'#0b1428'); g.addColorStop(.38,'#1a2136');
-    g.addColorStop(.44,'#3a3040'); g.addColorStop(.472,'#7a4634'); g.addColorStop(.49,'#cf7434');
-    g.addColorStop(.5,'#f2a557'); g.addColorStop(.53,'#b06336'); g.addColorStop(.6,'#241d20'); g.addColorStop(1,'#0a0a10');
+    g.addColorStop(0,'#04060c');  g.addColorStop(.24,'#080d18'); g.addColorStop(.38,'#101827');
+    g.addColorStop(.455,'#1d2836'); g.addColorStop(.487,'#33414f'); g.addColorStop(.5,'#4a5866');
+    g.addColorStop(.53,'#232c37'); g.addColorStop(.62,'#0d1119'); g.addColorStop(1,'#07080d');
     x.fillStyle=g; x.fillRect(0,0,w,h);
-    /* sunset hotspot just above the horizon on one azimuth */
+    /* faint cold remnant glow at one azimuth — barely-there, desaturated */
     const sx=w*.68, sy=h*.5;
-    const rg=x.createRadialGradient(sx,sy,0,sx,sy,w*.2);
-    rg.addColorStop(0,'rgba(255,214,140,.9)'); rg.addColorStop(.35,'rgba(255,165,85,.4)'); rg.addColorStop(1,'rgba(255,150,70,0)');
+    const rg=x.createRadialGradient(sx,sy,0,sx,sy,w*.17);
+    rg.addColorStop(0,'rgba(178,196,212,.34)'); rg.addColorStop(.4,'rgba(140,158,176,.14)'); rg.addColorStop(1,'rgba(120,140,160,0)');
     x.fillStyle=rg;
-    x.save(); x.translate(sx,sy); x.scale(1,.32); x.translate(-sx,-sy);
+    x.save(); x.translate(sx,sy); x.scale(1,.3); x.translate(-sx,-sy);
     x.fillRect(0,0,w,h); x.restore();
-    /* wispy streak clouds hugging the horizon — irregular, non-repeating */
-    for(let i=0;i<13;i++){ const cy=h*(.415+Math.random()*.06), cw=w*(.08+Math.random()*.22), ch=2.5+Math.random()*6;
-      const cxp=Math.random()*w, alpha=.10+Math.random()*.16;
+    /* soft overcast cloud deck above the horizon band */
+    for(let i=0;i<11;i++){ const cy=h*(.40+Math.random()*.07), cw=w*(.1+Math.random()*.24), ch=3+Math.random()*8;
+      const cxp=Math.random()*w, alpha=.08+Math.random()*.1;
       const cg=x.createLinearGradient(0,cy-ch,0,cy+ch);
-      cg.addColorStop(0,`rgba(26,22,34,${alpha*.9})`); cg.addColorStop(.7,`rgba(${175+Math.random()*70|0},${90+Math.random()*55|0},46,${alpha})`); cg.addColorStop(1,'rgba(0,0,0,0)');
+      cg.addColorStop(0,`rgba(10,14,22,${alpha})`); cg.addColorStop(.7,`rgba(56,68,82,${alpha*.9})`); cg.addColorStop(1,'rgba(0,0,0,0)');
       x.fillStyle=cg;
       x.beginPath(); x.ellipse(cxp,cy,cw,ch,0,0,Math.PI*2); x.fill();
-      x.beginPath(); x.ellipse(cxp+cw*.4,cy+ch*.6,cw*.5,ch*.7,0,0,Math.PI*2); x.fill(); }
-    /* stars in the upper sky only */
-    for(let i=0;i<420;i++){ const sy2=Math.random()*h*.3;
-      x.fillStyle=`rgba(255,255,255,${.12+Math.random()*.45})`;
-      x.fillRect(Math.random()*w,sy2,1.4,1.4); }
+      x.beginPath(); x.ellipse(cxp+cw*.38,cy+ch*.5,cw*.5,ch*.65,0,0,Math.PI*2); x.fill(); }
+    /* sparse dim stars breaking through */
+    for(let i=0;i<230;i++){ const sy2=Math.random()*h*.26;
+      x.fillStyle=`rgba(225,235,245,${.08+Math.random()*.3})`;
+      x.fillRect(Math.random()*w,sy2,1.3,1.3); }
   });
   const dome=new THREE.Mesh(new THREE.SphereGeometry(760,48,32),
     new THREE.MeshBasicMaterial({map:sky, side:THREE.BackSide, fog:false}));
@@ -544,13 +544,13 @@ const poolTex=ctex(512,512,(x,w,h)=>{
   const pmrem=new THREE.PMREMGenerator(renderer);
   const envScene=new THREE.Scene(); envScene.add(dome.clone());
   scene.environment=pmrem.fromScene(envScene,.04).texture;
-  scene.environmentIntensity=.34;
+  scene.environmentIntensity=.42;
 }
 
 /* ================= lights ================= */
-scene.add(new THREE.HemisphereLight(0x2c3242, 0x0c0a08, .5));
-const sun=new THREE.DirectionalLight(0xffb070, 1.15);          /* low warm sunset key */
-sun.position.set(60,18,-40);
+scene.add(new THREE.HemisphereLight(0x39485a, 0x0b0d12, .72));
+const sun=new THREE.DirectionalLight(0xcfdcec, .95);           /* high cool overcast key */
+sun.position.set(38,52,-26);
 sun.castShadow=!isMobile;
 sun.shadow.mapSize.set(2048,2048);
 sun.shadow.camera.left=-26; sun.shadow.camera.right=26;
@@ -558,7 +558,7 @@ sun.shadow.camera.top=26;  sun.shadow.camera.bottom=-26;
 sun.shadow.camera.near=2;  sun.shadow.camera.far=220;
 sun.shadow.bias=-.0005;
 scene.add(sun); scene.add(sun.target);
-const coolFill=new THREE.DirectionalLight(0x314458,.5); coolFill.position.set(-40,50,30); scene.add(coolFill);
+const coolFill=new THREE.DirectionalLight(0x2b3a4c,.4); coolFill.position.set(-40,50,30); scene.add(coolFill);
 
 /* ================= route ================= */
 /* world route: desk (elevated) → curb line → corridor with S-curves → up wireless pole → work zone */
@@ -600,6 +600,7 @@ function tForZ(zTarget){
 }
 
 /* ================= STOPS ================= */
+/* Real project lifecycle: survey → design → engineer → permit → build the air layer → as-built record */
 const STOPS=[
   {key:'open',   kick:'',                                title:'',                             sub:'', tags:[], z:null,  t:.008},
   {key:'survey', kick:'Field Survey & Data Collection',  title:'Field Survey & Data Collection',
@@ -607,19 +608,19 @@ const STOPS=[
     tags:['GPS / GIS walkouts','Pole data','Field photos'], z:-72},
   {key:'fiber',  kick:'Fiber Network Design',            title:'Fiber Network Design',
     sub:'Backbone, laterals and the last drop — the whole neighborhood, engineered as one network.',
-    tags:['FTTH / FTTx','HLD & LLD','BEAD engineering'], z:-175},
+    tags:['FTTH / FTTx','HLD & LLD','BEAD engineering'], z:-160},
   {key:'osp',    kick:'OSP Engineering',                 title:'OSP Engineering',
     sub:'Handholes, cabinets, conduit and poles — plant engineered to carrier spec and code.',
-    tags:['Make-ready','Pole loading','Splice design'], z:-262},
-  {key:'cad',    kick:'CAD / GIS & As-Built',            title:'CAD / GIS & As-Built',
-    sub:'The built world becomes the digital record — one source of truth for the whole route.',
-    tags:['AutoCAD','ArcGIS / 3GIS','Redlines → As-builts'], z:-350},
-  {key:'wifi',   kick:'Wireless Engineering',            title:'Wireless Engineering',
-    sub:'Where the fixed network meets the air — sites designed, towers analyzed, backhaul engineered.',
-    tags:['Small cell','TIA-222 structural','DAS & backhaul'], z:-438},
+    tags:['Make-ready','Pole loading','Splice design'], z:-252},
   {key:'permit', kick:'Permitting & Regulatory',         title:'Permitting & Regulatory',
-    sub:'An authorized, controlled work zone — the route is legal, staged and cleared to build.',
-    tags:['ROW permits','DOT / municipal','MOT plans'], z:-528},
+    sub:'Before anything is built, the route is made legal — permitted, staged and cleared.',
+    tags:['ROW permits','DOT / municipal','MOT plans'], z:-336},
+  {key:'wifi',   kick:'Wireless Engineering',            title:'Wireless Engineering',
+    sub:'The build reaches the air — sites designed, towers analyzed, backhaul engineered.',
+    tags:['Small cell','TIA-222 structural','DAS & backhaul'], z:-416},
+  {key:'cad',    kick:'CAD / GIS & As-Built',            title:'CAD / GIS & As-Built',
+    sub:'The built world becomes the record — the route returns to the desk as one source of truth.',
+    tags:['AutoCAD','ArcGIS / 3GIS','Redlines → As-builts'], z:-500},
 ];
 STOPS.forEach(s=>{ if(s.z!==null) s.t=tForZ(s.z); });
 
@@ -735,7 +736,7 @@ ribbon(-ROAD_OFF-3.45, -ROAD_OFF-4.4, .002, gravelTex, null, .95, 170);         
   const armGeo=new THREE.CylinderGeometry(.04,.04,2.1,10);
   const headGeo=new THREE.BoxGeometry(.62,.16,.26);
   const poleMat=new THREE.MeshStandardMaterial({map:galvTex, color:0x9aa1a8, roughness:.5, metalness:.7});
-  const headMat=new THREE.MeshStandardMaterial({color:0x14100a, roughness:.4, metalness:.5, emissive:0xffb763, emissiveIntensity:2.6});
+  const headMat=new THREE.MeshStandardMaterial({color:0x0e1012, roughness:.4, metalness:.5, emissive:0xe9eff5, emissiveIntensity:2.2});
   const pool=new THREE.PlaneGeometry(7,7);
   const poolMat=new THREE.MeshBasicMaterial({map:poolTex, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, opacity:.8});
   for(let i=0;i<N;i++){
@@ -3010,54 +3011,58 @@ SCENES.permit = {
 }
 
 
-/* ---------- engine-side scene patches ---------- */
-/* fiber: signature high-oblique aerial — neighborhood lives on the +SD side; shoot from over the road */
-{
-  const s=STOPS.find(o=>o.key==='fiber'), p=rp(s.t), sd=sideOf(s.t), tn=rt(s.t);
-  SCENES.fiber.camPos=new THREE.Vector3(p.x-sd.x*8+tn.x*-9, 26, p.z-sd.z*8+tn.z*-9);
-  SCENES.fiber.lookAt=new THREE.Vector3(p.x+sd.x*17+tn.x*-2, 0, p.z+sd.z*17+tn.z*-2);
+/* ---------- engine-side cinematography (34mm lens — subjects fill the frame) ---------- */
+function stopBasis(key){ const s=STOPS.find(o=>o.key===key);
+  return {s, p:rp(s.t), sd:sideOf(s.t), tn:rt(s.t), gp:SCENES[key].group.position}; }
+/* survey: hero medium close-up — full tripod in frame, center-right */
+{ const {p,sd,tn,gp}=stopBasis('survey');
+  SCENES.survey.camPos=new THREE.Vector3(gp.x-sd.x*2.6+tn.x*-3.2, 1.5, gp.z-sd.z*2.6+tn.z*-3.2);
+  SCENES.survey.lookAt=new THREE.Vector3(gp.x+tn.x*.15, .95, gp.z+tn.z*.15);
 }
-/* wireless: pull back + up so the full monopole frames center-right */
-{
-  const s=STOPS.find(o=>o.key==='wifi'), p=rp(s.t), sd=sideOf(s.t), tn=rt(s.t);
-  const gp=SCENES.wifi.group.position;
-  SCENES.wifi.camPos=new THREE.Vector3(p.x-sd.x*6.6+tn.x*-8.6, 4.0, p.z-sd.z*6.6+tn.z*-8.6);
-  SCENES.wifi.lookAt=new THREE.Vector3(gp.x, 5.0, gp.z);
+/* fiber: high oblique over the lit grid — the network IS the frame */
+{ const {p,sd,tn}=stopBasis('fiber');
+  SCENES.fiber.camPos=new THREE.Vector3(p.x-sd.x*7+tn.x*-10, 27, p.z-sd.z*7+tn.z*-10);
+  SCENES.fiber.lookAt=new THREE.Vector3(p.x+sd.x*16+tn.x*-2, 0, p.z+sd.z*16+tn.z*-2);
 }
-/* permit: widen so the permit table + hardhat join the truck in frame */
-{
-  const s=STOPS.find(o=>o.key==='permit'), p=rp(s.t), sd=sideOf(s.t), tn=rt(s.t);
-  const gp=SCENES.permit.group.position;
-  SCENES.permit.camPos=new THREE.Vector3(p.x-sd.x*5.6+tn.x*-8.6, 2.05, p.z-sd.z*5.6+tn.z*-8.6);
-  SCENES.permit.lookAt=new THREE.Vector3(gp.x-tn.x*.6, 1.0, gp.z-tn.z*.6);
+/* osp: cabinet + handhole + riser read together, pole trunk pushed to the right third */
+{ const {p,sd,tn,gp}=stopBasis('osp');
+  SCENES.osp.camPos=new THREE.Vector3(gp.x-sd.x*4.2+tn.x*-6.2, 1.9, gp.z-sd.z*4.2+tn.z*-6.2);
+  SCENES.osp.lookAt=new THREE.Vector3(gp.x+tn.x*1.2, 1.5, gp.z+tn.z*1.2);
 }
-/* cad: pull the camera in close on the workstation */
-{
-  const s=STOPS.find(o=>o.key==='cad'), p=rp(s.t), sd=sideOf(s.t), tn=rt(s.t);
-  const gp=SCENES.cad.group.position;
-  SCENES.cad.camPos=new THREE.Vector3(p.x-sd.x*3.1+tn.x*-3.7, 1.52, p.z-sd.z*3.1+tn.z*-3.7);
-  SCENES.cad.lookAt=new THREE.Vector3(gp.x, 1.0, gp.z);
+/* permit: 3/4 down the work zone — truck + barricade + cones read together */
+{ const {p,sd,tn,gp}=stopBasis('permit');
+  SCENES.permit.camPos=new THREE.Vector3(gp.x-sd.x*5.2+tn.x*-8.4, 2.0, gp.z-sd.z*5.2+tn.z*-8.4);
+  SCENES.permit.lookAt=new THREE.Vector3(gp.x-tn.x*.2, 1.05, gp.z-tn.z*.2);
 }
-/* survey: dodge the instanced pole line and get closer to the instrument */
-{
-  const s=STOPS.find(o=>o.key==='survey'), p=rp(s.t), sd=sideOf(s.t), tn=rt(s.t);
-  const gp=SCENES.survey.group.position;
-  SCENES.survey.camPos=new THREE.Vector3(p.x-sd.x*3.3+tn.x*-4.3, 1.58, p.z-sd.z*3.3+tn.z*-4.3);
-  SCENES.survey.lookAt=new THREE.Vector3(gp.x+tn.x*.4, 1.12, gp.z+tn.z*.4);
+/* wireless: hero angle — full head-frame in shot, monopole fills frame height */
+{ const {p,sd,tn,gp}=stopBasis('wifi');
+  SCENES.wifi.camPos=new THREE.Vector3(gp.x-sd.x*5.8+tn.x*-7.4, 2.4, gp.z-sd.z*5.8+tn.z*-7.4);
+  SCENES.wifi.lookAt=new THREE.Vector3(gp.x, 5.5, gp.z);
 }
-/* station fill: soft warm work-glow riding the active stop so subjects never read as pure silhouettes */
-const stationFill=new THREE.PointLight(0xffd2a0, 46, 30, 2);
+/* cad (finale): operator side, angled past the canopy post — both screens read */
+{ const {p,sd,tn,gp}=stopBasis('cad');
+  SCENES.cad.camPos=new THREE.Vector3(gp.x+sd.x*3.1+tn.x*-1.6, 1.44, gp.z+sd.z*3.1+tn.z*-1.6);
+  SCENES.cad.lookAt=new THREE.Vector3(gp.x+tn.x*.3, 1.0, gp.z+tn.z*.3);
+}
+/* ---------- film rig: neutral key + soft fill riding the active stop ---------- */
+/* per-stop intensities — the opener keeps its own warm lamp; the aerial uses area lights */
+const RIG={open:{k:0,f:5}, survey:{k:46,f:32}, fiber:{k:0,f:520}, osp:{k:42,f:30},
+           permit:{k:34,f:28}, wifi:{k:38,f:26}, cad:{k:26,f:22}};
+const stationFill=new THREE.PointLight(0xe8eef6, 40, 30, 2);   /* cool ambient lift */
 scene.add(stationFill);
-/* fiber aerial: the neighborhood sits on the +SD side (Object3D.lookAt points +z at target,
-   so the module's local -z runs AWAY from the road) — light it there */
+const keyLight=new THREE.SpotLight(0xf2f6fa, 70, 40, .72, .5, 1.8);  /* white LED work-light key */
+keyLight.castShadow=false;
+scene.add(keyLight); scene.add(keyLight.target);
+/* fiber aerial: neutral area lift over the neighborhood grid (+SD side) */
 {
   const s=STOPS.find(o=>o.key==='fiber'), p=rp(s.t), sd=sideOf(s.t);
-  const hoodFill=new THREE.PointLight(0x93a7c4, 58, 70, 2);
-  hoodFill.position.set(p.x+sd.x*18, 18, p.z+sd.z*18);
+  /* aerial scale: decay-2 point lights need hundreds of candela to matter from 15-20m up */
+  const hoodFill=new THREE.PointLight(0xaebfd4, 640, 90, 2);
+  hoodFill.position.set(p.x+sd.x*16, 19, p.z+sd.z*16);
   scene.add(hoodFill);
-  const hoodWarm=new THREE.PointLight(0xffb46a, 22, 34, 2);
-  hoodWarm.position.set(p.x+sd.x*10, 7, p.z+sd.z*10);
-  scene.add(hoodWarm);
+  const hoodLift=new THREE.PointLight(0xdde6ef, 230, 46, 2);
+  hoodLift.position.set(p.x+sd.x*8, 9, p.z+sd.z*8);
+  scene.add(hoodLift);
 }
 
 /* ================= state machine (swipe → travel → loop) ================= */
@@ -3216,8 +3221,19 @@ function frame(){
   mx+=(tmx-mx)*.05; my+=(tmy-my)*.05;
   updateCamera(time);
   { const sc=SCENES[STOPS[cur].key];
-    if(sc){ const gp=sc.group.position;
-      stationFill.position.set((gp.x+camPos.x)/2, Math.max(4.2,(sc.lookAt.y||1)+3.4), (gp.z+camPos.z)/2); } }
+    if(sc){ const gp=sc.group.position, rig=RIG[STOPS[cur].key]||{k:40,f:28};
+      stationFill.intensity=rig.f;
+      keyLight.intensity=rig.k;
+      if(STOPS[cur].key==='fiber'){ /* aerial: fill floats over the neighborhood itself */
+        stationFill.position.set(sc.lookAt.x, 13, sc.lookAt.z);
+      } else {
+        stationFill.position.set((gp.x+camPos.x)/2, Math.max(4.4,(sc.lookAt.y||1)+3.6), (gp.z+camPos.z)/2);
+      }
+      /* key: high camera-left, raking across the subject like an LED site flood */
+      const vx=sc.lookAt.x-camPos.x, vz=sc.lookAt.z-camPos.z, vl=Math.hypot(vx,vz)||1;
+      const lx=-(vz/vl), lz=(vx/vl); /* left-perp of view dir */
+      keyLight.position.set(camPos.x+lx*3.4, camPos.y+3.2, camPos.z+lz*3.4);
+      keyLight.target.position.copy(sc.lookAt); keyLight.target.updateMatrixWorld(); } }
   if(routeShader) routeShader.uniforms.uTime.value=time;
   const act=1;
   for(const k in SCENES){ if(SCENES[k].group.visible!==false) SCENES[k].update(time,act); }
