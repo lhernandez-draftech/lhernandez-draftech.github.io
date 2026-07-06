@@ -235,7 +235,11 @@ import * as BGU from 'three/addons/utils/BufferGeometryUtils.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 /* ============================================================
    DRAFTECH 3D ROUTE JOURNEY — high-fidelity redesign
@@ -273,11 +277,64 @@ const scene=new THREE.Scene();
 scene.fog=new THREE.FogExp2(0x0a0d13, .0095);
 const camera=new THREE.PerspectiveCamera(34,1,.05,900);   /* longer lens — compressed, professional */
 
+/* ================= cinematic post stack ================= */
 const rtOpts={samples:isMobile?0:4, type:THREE.HalfFloatType};
 const composer=new EffectComposer(renderer, new THREE.WebGLRenderTarget(8,8,rtOpts));
 composer.addPass(new RenderPass(scene,camera));
-const bloom=new UnrealBloomPass(new THREE.Vector2(8,8), .34, .3, .92);
+
+/* GTAO — ground-truth ambient occlusion: contact shadows + depth that read as "rendered" */
+let gtao=null;
+if(!isMobile){
+  gtao=new GTAOPass(scene, camera, 8, 8);
+  gtao.output=GTAOPass.OUTPUT.Default;
+  gtao.updateGtaoMaterial({ radius:1.4, distanceExponent:1.0, thickness:1.4, scale:1.0, samples:16, distanceFallOff:1.0, screenSpaceRadius:false });
+  gtao.updatePdMaterial({ lumaPhi:10, depthPhi:2, normalPhi:3, radius:4, radiusExponent:1, rings:4, samples:16 });
+  composer.addPass(gtao);
+}
+
+const bloom=new UnrealBloomPass(new THREE.Vector2(8,8), .34, .28, .9);
 composer.addPass(bloom);
+
+/* subtle depth-of-field — subject sharp, world falls off (focus tracked to camera→lookAt each frame) */
+let bokeh=null;
+if(!isMobile){
+  bokeh=new BokehPass(scene, camera, { focus:10.0, aperture:0.00055, maxblur:0.006 });
+  composer.addPass(bokeh);
+}
+
+/* final grade: filmic contrast, cool desaturation, vignette, grain, faint chromatic aberration */
+const GradeShader={
+  uniforms:{ tDiffuse:{value:null}, uTime:{value:0}, uVig:{value:1.0}, uGrain:{value:0.018},
+             uContrast:{value:1.05}, uSat:{value:0.92}, uCA:{value:0.0013} },
+  vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader:`
+    varying vec2 vUv; uniform sampler2D tDiffuse; uniform float uTime,uVig,uGrain,uContrast,uSat,uCA;
+    float hash(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
+    void main(){
+      vec2 d=vUv-0.5;
+      /* chromatic aberration toward the edges */
+      vec2 ca=d*uCA;
+      vec3 col;
+      col.r=texture2D(tDiffuse,vUv+ca).r;
+      col.g=texture2D(tDiffuse,vUv).g;
+      col.b=texture2D(tDiffuse,vUv-ca).b;
+      /* contrast around mid + slight desaturation for the pro engineering grade */
+      col=(col-0.5)*uContrast+0.5;
+      float l=dot(col,vec3(0.2126,0.7152,0.0722));
+      col=mix(vec3(l),col,uSat);
+      /* cool the shadows a hair */
+      col.b+=(1.0-l)*0.015;
+      /* vignette */
+      float vig=smoothstep(0.98,0.34,length(d)*uVig);
+      col*=mix(0.74,1.0,vig);
+      /* fine film grain — modulated down in highlights so it doesn't sizzle */
+      float g=hash(floor(vUv*vec2(1600.0,900.0))+fract(uTime*0.6));
+      col+=(g-0.5)*uGrain*(1.0-0.6*l);
+      gl_FragColor=vec4(col,1.0);
+    }`
+};
+const gradePass=new ShaderPass(GradeShader);
+composer.addPass(gradePass);
 composer.addPass(new OutputPass());
 
 /* ================= texture helpers ================= */
@@ -552,11 +609,11 @@ scene.add(new THREE.HemisphereLight(0x39485a, 0x0b0d12, .72));
 const sun=new THREE.DirectionalLight(0xcfdcec, .95);           /* high cool overcast key */
 sun.position.set(38,52,-26);
 sun.castShadow=!isMobile;
-sun.shadow.mapSize.set(2048,2048);
-sun.shadow.camera.left=-26; sun.shadow.camera.right=26;
-sun.shadow.camera.top=26;  sun.shadow.camera.bottom=-26;
+sun.shadow.mapSize.set(4096,4096);
+sun.shadow.camera.left=-22; sun.shadow.camera.right=22;
+sun.shadow.camera.top=22;  sun.shadow.camera.bottom=-22;
 sun.shadow.camera.near=2;  sun.shadow.camera.far=220;
-sun.shadow.bias=-.0005;
+sun.shadow.bias=-.0004; sun.shadow.normalBias=.02;
 scene.add(sun); scene.add(sun.target);
 const coolFill=new THREE.DirectionalLight(0x2b3a4c,.4); coolFill.position.set(-40,50,30); scene.add(coolFill);
 
@@ -2741,116 +2798,133 @@ function tuft(x,z,s){
 }
 tuft(-2.7,1.15,1.0); tuft(2.85,1.55,0.85); tuft(-1.0,1.85,0.9);
 
-// ================= TRUCK =================
+// ================= TRUCK — proper crew-cab pickup (rounded panels + real wheels) =================
 const truckGroup = new THREE.Group();
-truckGroup.position.set(1.55,0,0.55);
-truckGroup.rotation.y=-0.12;
+truckGroup.position.set(1.55,0,0.7);
+truckGroup.rotation.y=2.5;   /* front-3/4 angled toward the arriving camera */
 g.add(truckGroup);
+/* local frame: +x = front→rear axis, y up, z = width. length ~5.4m, width W, wheelbase ~3.3m */
+const W=1.98;
+const rbox=(w,h,d,r,seg)=>new RoundedBoxGeometry(w,h,d,seg||4,r);
+const matChrome=new THREE.MeshStandardMaterial({color:0xc7ccd2, roughness:0.22, metalness:1.0, envMapIntensity:1.5});
+const matBlackTrim=new THREE.MeshStandardMaterial({color:0x14161a, roughness:0.5, metalness:0.35});
+const matRim=new THREE.MeshStandardMaterial({color:0x9aa0a6, roughness:0.35, metalness:0.9, envMapIntensity:1.4});
 
-const W=1.95; // vehicle width (z)
-const shape = new THREE.Shape();
-shape.moveTo(0,0.55);
-shape.lineTo(0,0.95);
-shape.lineTo(0.15,1.05);
-shape.lineTo(1.35,1.15);
-shape.lineTo(1.55,1.85);
-shape.lineTo(3.05,1.85);
-shape.lineTo(3.25,1.35);
-shape.lineTo(3.25,1.05);
-shape.lineTo(5.15,1.05);
-shape.lineTo(5.3,0.95);
-shape.lineTo(5.3,0.55);
-shape.lineTo(5.15,0.45);
-shape.lineTo(3.25,0.45);
-shape.lineTo(1.35,0.45);
-shape.lineTo(0,0.55);
-const bodyGeo = new THREE.ExtrudeGeometry(shape,{depth:W,bevelEnabled:true,bevelThickness:0.025,bevelSize:0.02,bevelSegments:2,curveSegments:2});
-bodyGeo.translate(0,0,-W/2);
-const bodyMesh = new THREE.Mesh(bodyGeo, matPaint);
-bodyMesh.castShadow=true; bodyMesh.receiveShadow=true;
-truckGroup.add(bodyMesh);
+/* --- lower body / rocker (runs full length) --- */
+const lower=new THREE.Mesh(rbox(5.25,0.52,W-0.06,0.09), matPaint);
+lower.position.set(2.62,0.72,0); lower.castShadow=lower.receiveShadow=true; truckGroup.add(lower);
 
-// windshield + side glass
-const windshield = new THREE.Mesh(new THREE.PlaneGeometry(0.85,0.42), matGlass);
-windshield.position.set(1.48,1.55,0);
-windshield.rotation.y=Math.PI/2; windshield.rotation.x=0.42;
-truckGroup.add(windshield);
+/* --- hood + front clip --- */
+const hood=new THREE.Mesh(rbox(1.55,0.42,W-0.12,0.11), matPaint);
+hood.position.set(0.85,1.06,0); hood.rotation.z=0.02; hood.castShadow=true; truckGroup.add(hood);
+const fascia=new THREE.Mesh(rbox(0.28,0.62,W-0.04,0.1), matPaint);
+fascia.position.set(0.14,0.92,0); fascia.castShadow=true; truckGroup.add(fascia);
+
+/* --- crew cab: lower body + greenhouse (glass) + roof --- */
+const cabLower=new THREE.Mesh(rbox(2.15,0.66,W-0.05,0.1), matPaint);
+cabLower.position.set(2.35,1.12,0); cabLower.castShadow=cabLower.receiveShadow=true; truckGroup.add(cabLower);
+/* greenhouse — slightly inset dark glass block, then a paint roof on top */
+const greenhouse=new THREE.Mesh(rbox(1.92,0.56,W-0.18,0.07), matGlass);
+greenhouse.position.set(2.42,1.63,0); truckGroup.add(greenhouse);
+const aPillarF=new THREE.Mesh(rbox(0.09,0.6,W-0.16,0.03), matPaint);
+aPillarF.position.set(1.5,1.62,0); aPillarF.rotation.z=0.28; truckGroup.add(aPillarF);
+const bPillar=new THREE.Mesh(rbox(0.07,0.56,W-0.14,0.02), matBlackTrim);
+bPillar.position.set(2.45,1.63,0); truckGroup.add(bPillar);
+const roof=new THREE.Mesh(rbox(1.78,0.16,W-0.12,0.07), matPaint);
+roof.position.set(2.5,1.95,0); roof.castShadow=true; truckGroup.add(roof);
+
+/* --- bed: floor + 3 side walls + tailgate (open box) --- */
+const bedFloor=new THREE.Mesh(rbox(2.05,0.12,W-0.14,0.04), matPaint);
+bedFloor.position.set(4.35,1.02,0); bedFloor.receiveShadow=true; truckGroup.add(bedFloor);
 for(const side of [1,-1]){
-  const win = new THREE.Mesh(new THREE.PlaneGeometry(1.35,0.42), matGlass);
-  win.position.set(2.3,1.6, side*(W/2+0.006));
-  win.rotation.y = side>0? Math.PI/2 : -Math.PI/2;
-  truckGroup.add(win);
+  const wall=new THREE.Mesh(rbox(2.05,0.5,0.12,0.05), matPaint);
+  wall.position.set(4.35,1.28, side*(W/2-0.09)); wall.castShadow=true; truckGroup.add(wall);
 }
+const bedFront=new THREE.Mesh(rbox(0.12,0.5,W-0.14,0.05), matPaint);
+bedFront.position.set(3.34,1.28,0); truckGroup.add(bedFront);
+const tailgate=new THREE.Mesh(rbox(0.12,0.46,W-0.14,0.05), matPaint);
+tailgate.position.set(5.38,1.24,0); tailgate.castShadow=true; truckGroup.add(tailgate);
 
-// bumpers + grille
-const frontBumper = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.4,W), matGrille);
-frontBumper.position.set(0.02,0.72,0); frontBumper.castShadow=true; truckGroup.add(frontBumper);
-const rearBumper = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.4,W), matGrille);
-rearBumper.position.set(5.28,0.72,0); rearBumper.castShadow=true; truckGroup.add(rearBumper);
-const grille = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.34,1.15), matGrille);
-grille.position.set(0.08,0.98,0); grille.castShadow=true; truckGroup.add(grille);
+/* --- fender flares over each wheel (bulged arches) --- */
+const wheelR=0.44, frontX=1.02, rearX=4.28, axleY=wheelR, wheelZ=W/2-0.02;
+function flare(x){ for(const side of [1,-1]){
+  const arch=new THREE.Mesh(new THREE.TorusGeometry(0.56,0.11,10,20,Math.PI), matBlackTrim);
+  arch.position.set(x,axleY+0.02, side*(W/2-0.05));
+  arch.rotation.set(0, side>0?0:Math.PI, 0); arch.rotation.x=Math.PI; arch.rotation.z=Math.PI;
+  arch.rotation.y=Math.PI/2; arch.castShadow=true; truckGroup.add(arch);
+}}
+flare(frontX); flare(rearX);
 
-// headlights
+/* --- grille + chrome bar + headlights --- */
+const grille=new THREE.Mesh(rbox(0.08,0.34,1.18,0.02), matGrille);
+grille.position.set(0.05,1.0,0); truckGroup.add(grille);
+const chromeBar=new THREE.Mesh(rbox(0.06,0.08,1.24,0.02), matChrome);
+chromeBar.position.set(0.03,1.12,0); truckGroup.add(chromeBar);
 for(const side of [1,-1]){
-  const hl = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.14,0.24), matHeadlight);
-  hl.position.set(0.06,1.0, side*0.72); truckGroup.add(hl);
+  const hl=new THREE.Mesh(rbox(0.1,0.16,0.3,0.03), matHeadlight);
+  hl.position.set(0.06,1.06, side*0.62); truckGroup.add(hl);
 }
+/* front + rear bumpers (chromed) */
+const fBumper=new THREE.Mesh(rbox(0.16,0.22,W+0.02,0.05), matChrome);
+fBumper.position.set(-0.02,0.72,0); fBumper.castShadow=true; truckGroup.add(fBumper);
+const rBumper=new THREE.Mesh(rbox(0.16,0.22,W+0.02,0.05), matChrome);
+rBumper.position.set(5.46,0.72,0); rBumper.castShadow=true; truckGroup.add(rBumper);
 
-// mirrors
+/* --- mirrors --- */
 for(const side of [1,-1]){
-  const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.16,10), MATP.dark);
-  stalk.position.set(1.5,1.58, side*(W/2+0.06));
-  stalk.rotation.z=Math.PI/2*0.2;
-  truckGroup.add(stalk);
-  const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.14,0.16), MATP.dark);
-  mirror.position.set(1.46,1.58, side*(W/2+0.14));
-  truckGroup.add(mirror);
+  const stalk=new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.016,0.18,10), matBlackTrim);
+  stalk.position.set(1.62,1.5, side*(W/2+0.04)); stalk.rotation.x=side*0.5; truckGroup.add(stalk);
+  const housing=new THREE.Mesh(rbox(0.08,0.16,0.11,0.03), matBlackTrim);
+  housing.position.set(1.58,1.52, side*(W/2+0.13)); truckGroup.add(housing);
+}
+/* door seam + handle so the side reads as a door */
+for(const side of [1,-1]){
+  const seam=new THREE.Mesh(new THREE.BoxGeometry(0.012,0.5,0.006), matBlackTrim);
+  seam.position.set(2.9,1.12, side*(W/2)); truckGroup.add(seam);
+  const handle=new THREE.Mesh(rbox(0.12,0.03,0.02,0.01), matChrome);
+  handle.position.set(2.6,1.28, side*(W/2+0.01)); truckGroup.add(handle);
 }
 
-// door decal
-const doorDecal = new THREE.Mesh(new THREE.PlaneGeometry(0.5,0.29), matDecal);
-doorDecal.position.set(2.15,1.0, W/2+0.004);
-doorDecal.rotation.y=Math.PI/2;
-truckGroup.add(doorDecal);
-
-// wheel arch trim (visual suggestion, not boolean cut)
-function archTrim(x,z){
-  const arch = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.5,0.1), MATP.dark);
-  arch.position.set(x,0.42,z);
-  truckGroup.add(arch);
+// door decal (DRAFTECH)
+for(const side of [1,-1]){
+  const doorDecal=new THREE.Mesh(new THREE.PlaneGeometry(0.62,0.36), matDecal);
+  doorDecal.position.set(2.4,1.06, side*(W/2+0.005));
+  doorDecal.rotation.y=side>0?-Math.PI/2:Math.PI/2;
+  truckGroup.add(doorDecal);
 }
-const wheelR=0.42, tubeR=0.15, mainR=wheelR-tubeR;
-const frontX=0.85, rearX=4.45, wheelZ=W/2-0.14;
-archTrim(frontX,wheelZ); archTrim(frontX,-wheelZ);
-archTrim(rearX,wheelZ); archTrim(rearX,-wheelZ);
 
-function wheel(x,z){
+/* --- wheels: tire + multi-spoke rim + hub + brake disc --- */
+function wheel(x,z,steer){
   const grp=new THREE.Group();
-  const tire=new THREE.Mesh(new THREE.TorusGeometry(mainR,tubeR,14,24), matTire);
-  tire.rotation.y=Math.PI/2; tire.castShadow=true;
-  const sidewall=new THREE.Mesh(new THREE.TorusGeometry(mainR,tubeR-0.02,8,24), matSidewall);
-  sidewall.rotation.y=Math.PI/2; sidewall.position.x=0.01;
-  const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.16,24), MATP.steel);
-  hub.rotation.z=Math.PI/2; hub.castShadow=true;
-  grp.add(tire,sidewall,hub);
-  grp.position.set(x,wheelR,z);
-  truckGroup.add(grp);
+  const tire=new THREE.Mesh(new THREE.CylinderGeometry(wheelR,wheelR,0.34,32,1,true), matTire);
+  tire.rotation.x=Math.PI/2; tire.castShadow=true; grp.add(tire);
+  for(const s of [1,-1]){ /* sidewalls */
+    const sw=new THREE.Mesh(new THREE.RingGeometry(0.26,wheelR,32), matSidewall);
+    sw.position.z=s*0.17; if(s<0)sw.rotation.y=Math.PI; grp.add(sw);
+  }
+  const rim=new THREE.Mesh(new THREE.CylinderGeometry(0.27,0.27,0.24,28), matRim);
+  rim.rotation.x=Math.PI/2; grp.add(rim);
+  const dish=new THREE.Mesh(new THREE.CircleGeometry(0.26,28), matRim);
+  dish.position.z=0.18; grp.add(dish);
+  for(let i=0;i<6;i++){ const a=i/6*Math.PI*2; /* spokes */
+    const sp=new THREE.Mesh(rbox(0.05,0.34,0.03,0.01), matRim);
+    sp.position.set(Math.cos(a)*0.15, Math.sin(a)*0.15, 0.185); sp.rotation.z=a; grp.add(sp);
+  }
+  const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.06,16), matChrome);
+  cap.rotation.x=Math.PI/2; cap.position.z=0.2; grp.add(cap);
+  grp.position.set(x,axleY,z); if(steer) grp.rotation.y=0.12; truckGroup.add(grp);
 }
-wheel(frontX,wheelZ); wheel(frontX,-wheelZ); wheel(rearX,wheelZ); wheel(rearX,-wheelZ);
+for(const side of [1,-1]){ wheel(frontX, side*wheelZ, side>0); wheel(rearX, side*wheelZ, false); }
 
-// roof lightbar
-const lightbarGrp = new THREE.Group();
-lightbarGrp.position.set(2.3,1.92,0);
-truckGroup.add(lightbarGrp);
-const barHousing = new THREE.Mesh(new THREE.BoxGeometry(0.95,0.08,0.2), MATP.dark);
+// roof lightbar (amber)
+const lightbarGrp=new THREE.Group(); lightbarGrp.position.set(2.35,2.06,0); truckGroup.add(lightbarGrp);
+const barHousing=new THREE.Mesh(rbox(0.98,0.09,0.22,0.03), matBlackTrim);
 barHousing.castShadow=true; lightbarGrp.add(barHousing);
 const lensMats=[matLens0, matLens1, matLens2];
 const lensSegs=[];
 for(let i=0;i<3;i++){
-  const seg=new THREE.Mesh(new THREE.BoxGeometry(0.26,0.09,0.16), lensMats[i]);
-  seg.position.set((i-1)*0.3,0.005,0);
-  lightbarGrp.add(seg);
-  lensSegs.push(seg);
+  const seg=new THREE.Mesh(rbox(0.28,0.1,0.18,0.02), lensMats[i]);
+  seg.position.set((i-1)*0.31,0.02,0); lightbarGrp.add(seg); lensSegs.push(seg);
 }
 
 // ================= PERMIT TABLE =================
@@ -3024,15 +3098,15 @@ function stopBasis(key){ const s=STOPS.find(o=>o.key===key);
   SCENES.fiber.camPos=new THREE.Vector3(p.x-sd.x*7+tn.x*-10, 27, p.z-sd.z*7+tn.z*-10);
   SCENES.fiber.lookAt=new THREE.Vector3(p.x+sd.x*16+tn.x*-2, 0, p.z+sd.z*16+tn.z*-2);
 }
-/* osp: cabinet + handhole + riser read together, pole trunk pushed to the right third */
+/* osp: swing around so the pole sits left-third and the cabinet/handhole fill center-right */
 { const {p,sd,tn,gp}=stopBasis('osp');
-  SCENES.osp.camPos=new THREE.Vector3(gp.x-sd.x*4.2+tn.x*-6.2, 1.9, gp.z-sd.z*4.2+tn.z*-6.2);
-  SCENES.osp.lookAt=new THREE.Vector3(gp.x+tn.x*1.2, 1.5, gp.z+tn.z*1.2);
+  SCENES.osp.camPos=new THREE.Vector3(gp.x-sd.x*5.6+tn.x*-4.4, 1.75, gp.z-sd.z*5.6+tn.z*-4.4);
+  SCENES.osp.lookAt=new THREE.Vector3(gp.x+sd.x*1.1+tn.x*1.0, 1.2, gp.z+sd.z*1.1+tn.z*1.0);
 }
-/* permit: 3/4 down the work zone — truck + barricade + cones read together */
+/* permit: cinematic front-3/4 hero on the truck, work zone reading behind */
 { const {p,sd,tn,gp}=stopBasis('permit');
-  SCENES.permit.camPos=new THREE.Vector3(gp.x-sd.x*5.2+tn.x*-8.4, 2.0, gp.z-sd.z*5.2+tn.z*-8.4);
-  SCENES.permit.lookAt=new THREE.Vector3(gp.x-tn.x*.2, 1.05, gp.z-tn.z*.2);
+  SCENES.permit.camPos=new THREE.Vector3(gp.x-sd.x*7.8+tn.x*-12.2, 2.5, gp.z-sd.z*7.8+tn.z*-12.2);
+  SCENES.permit.lookAt=new THREE.Vector3(gp.x+tn.x*1.6, 1.25, gp.z+tn.z*1.6);
 }
 /* wireless: hero angle — full head-frame in shot, monopole fills frame height */
 { const {p,sd,tn,gp}=stopBasis('wifi');
@@ -3046,8 +3120,8 @@ function stopBasis(key){ const s=STOPS.find(o=>o.key===key);
 }
 /* ---------- film rig: neutral key + soft fill riding the active stop ---------- */
 /* per-stop intensities — the opener keeps its own warm lamp; the aerial uses area lights */
-const RIG={open:{k:0,f:5}, survey:{k:46,f:32}, fiber:{k:0,f:520}, osp:{k:42,f:30},
-           permit:{k:34,f:28}, wifi:{k:38,f:26}, cad:{k:26,f:22}};
+const RIG={open:{k:0,f:5}, survey:{k:46,f:32}, fiber:{k:0,f:900}, osp:{k:46,f:34},
+           permit:{k:52,f:40}, wifi:{k:44,f:30}, cad:{k:26,f:22}};
 const stationFill=new THREE.PointLight(0xe8eef6, 40, 30, 2);   /* cool ambient lift */
 scene.add(stationFill);
 const keyLight=new THREE.SpotLight(0xf2f6fa, 70, 40, .72, .5, 1.8);  /* white LED work-light key */
@@ -3056,13 +3130,17 @@ scene.add(keyLight); scene.add(keyLight.target);
 /* fiber aerial: neutral area lift over the neighborhood grid (+SD side) */
 {
   const s=STOPS.find(o=>o.key==='fiber'), p=rp(s.t), sd=sideOf(s.t);
-  /* aerial scale: decay-2 point lights need hundreds of candela to matter from 15-20m up */
-  const hoodFill=new THREE.PointLight(0xaebfd4, 640, 90, 2);
-  hoodFill.position.set(p.x+sd.x*16, 19, p.z+sd.z*16);
+  /* aerial scale: decay-2 point lights need hundreds of candela to matter from 15-20m up
+     (GTAO darkens interiors further, so lift generously) */
+  const hoodFill=new THREE.PointLight(0xb4c4d8, 1150, 110, 2);
+  hoodFill.position.set(p.x+sd.x*16, 20, p.z+sd.z*16);
   scene.add(hoodFill);
-  const hoodLift=new THREE.PointLight(0xdde6ef, 230, 46, 2);
-  hoodLift.position.set(p.x+sd.x*8, 9, p.z+sd.z*8);
+  const hoodLift=new THREE.PointLight(0xe2ebf3, 420, 54, 2);
+  hoodLift.position.set(p.x+sd.x*8, 10, p.z+sd.z*8);
   scene.add(hoodLift);
+  const hoodBack=new THREE.PointLight(0x9fb4cc, 520, 90, 2);
+  hoodBack.position.set(p.x+sd.x*24, 16, p.z+sd.z*10);
+  scene.add(hoodBack);
 }
 
 /* ================= state machine (swipe → travel → loop) ================= */
@@ -3239,6 +3317,12 @@ function frame(){
   for(const k in SCENES){ if(SCENES[k].group.visible!==false) SCENES[k].update(time,act); }
   sceneUpdaters.forEach(f=>f(time));
   cullScenes();
+  /* rack focus to the subject; aerial stop wants deep focus */
+  if(bokeh){ const fd=camPos.distanceTo(camLook);
+    bokeh.uniforms['focus'].value += (fd-bokeh.uniforms['focus'].value)*.12;
+    const aer=STOPS[cur].key==='fiber';
+    bokeh.uniforms['aperture'].value = aer? 0.00012 : 0.00055; }
+  gradePass.uniforms.uTime.value=time;
   composer.render();
   frames++;
   if(frames===2){ loaderPct(100); setTimeout(loaderDone,250); }
@@ -3250,6 +3334,10 @@ loaderPct(30,'BUILDING THE WORLD');
 resize();
 setImmediate(bootStop);
 loaderPct(70,'LIGHTING THE ROUTE');
+/* pre-compile every scene's materials up front so the first swipe (which reveals all
+   scenes at once) never hitches mid-travel */
+try{ Object.keys(SCENES).forEach(k=>{ SCENES[k].group.visible=true; });
+     renderer.compile(scene,camera); composer.render(); }catch(e){}
 requestAnimationFrame(frame);
 setTimeout(loaderDone,12000);
 
