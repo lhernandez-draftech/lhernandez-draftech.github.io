@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Draftech International — One Partner. Every Phase.</title>
-<meta name="description" content="Follow the route: survey, fiber design, OSP engineering, CAD/GIS, wireless and permitting — Draftech International engineers every phase of the outside plant." />
+<meta name="description" content="Follow the route: survey, fiber design, OSP engineering, permitting, wireless and as-built — Draftech International engineers every phase of the outside plant." />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23080810'/%3E%3Cpath d='M5 24 C10 22 9 12 15 12 S22 20 27 8' fill='none' stroke='%2300e5ff' stroke-width='2.6' stroke-linecap='round'/%3E%3Ccircle cx='15' cy='12' r='2.4' fill='%2300e5ff'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -40,12 +40,12 @@
   #lpct{font-size:11px;letter-spacing:.28em;color:var(--dim);font-variant-numeric:tabular-nums}
 
   /* hero stage */
-  #hero{position:fixed;inset:0;z-index:50;background:#04040a;overflow:hidden;transition:opacity .8s ease,transform .8s cubic-bezier(.7,0,.2,1)}
+  #hero{position:fixed;inset:0;z-index:50;background:radial-gradient(130% 120% at 62% 45%,#0a0f1a 0%,#06070e 55%,#040509 100%);overflow:hidden;transition:opacity .8s ease,transform .8s cubic-bezier(.7,0,.2,1)}
   #hero.dismissed{opacity:0;transform:translateY(-8%);pointer-events:none}
   #world{position:absolute;inset:0;width:100%;height:100%}
   .vig{position:absolute;inset:0;pointer-events:none;z-index:3;
-    background:radial-gradient(128% 122% at 50% 42%,transparent 52%,rgba(3,3,8,.62) 100%),
-               linear-gradient(0deg,rgba(4,4,10,.55) 0%,rgba(4,4,10,0) 22%)}
+    background:radial-gradient(128% 122% at 50% 42%,transparent 54%,rgba(3,3,8,.6) 100%),
+               linear-gradient(0deg,rgba(4,4,10,.5) 0%,rgba(4,4,10,0) 22%)}
   .hud{position:absolute;inset:clamp(14px,2.6vw,34px);pointer-events:none;z-index:6}
   .hud .c{position:absolute;width:22px;height:22px;border:2px solid rgba(0,229,255,.4)}
   .hud .tl{top:0;left:0;border-right:0;border-bottom:0}.hud .tr{top:0;right:0;border-left:0;border-bottom:0}
@@ -162,7 +162,7 @@
   </nav>
 </header>
 
-<section id="hero" aria-label="Draftech 3D route journey — swipe to advance through each phase">
+<section id="hero" aria-label="Draftech route journey — swipe to advance through each phase">
   <canvas id="world"></canvas>
   <div class="vig"></div>
   <div class="hud" aria-hidden="true"><span class="c tl"></span><span class="c tr"></span><span class="c bl"></span><span class="c br"></span></div>
@@ -231,28 +231,27 @@
 
 <script type="module">
 import * as THREE from 'three';
-import * as BGU from 'three/addons/utils/BufferGeometryUtils.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
-import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
 /* ============================================================
-   DRAFTECH 3D ROUTE JOURNEY — high-fidelity redesign
-   Engine + world + desk opener. Scene modules plug in below.
+   DRAFTECH — HOLOGRAPHIC ENGINEERING (stylized line-art)
+   Dark grid void · one glowing cyan route · a crisp emblem per phase.
    ============================================================ */
-
+const TAU=Math.PI*2;
+const CY=0x2fe2ff, CY_HOT=0xd6fbff, CY_MID=0x00b4d8, AMBER=0xffb454, DIMC=0x0d5a70;
 const qs=new URLSearchParams(location.search);
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches || qs.has('noanim');
 const bootStop=qs.has('stop')? Math.max(0,Math.min(6,+qs.get('stop')||0)) : 0;
 
 function webglOK(){ try{ const c=document.createElement('canvas');
   return !!(window.WebGLRenderingContext&&(c.getContext('webgl2')||c.getContext('webgl'))); }catch(e){ return false; } }
-
 const loaderEl=document.getElementById('loader');
 const loaderDone=()=>loaderEl.classList.add('done');
 const loaderPct=(p,txt)=>{ document.getElementById('lfill').style.width=p+'%';
@@ -262,2949 +261,341 @@ if(!webglOK()){ document.body.classList.remove('hero-active'); document.body.cla
 else { boot(); }
 
 function boot(){
-
-/* ================= renderer & post ================= */
 const canvas=document.getElementById('world');
 const isMobile=Math.min(innerWidth,innerHeight)<640;
-const renderer=new THREE.WebGLRenderer({canvas, antialias:false, powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(devicePixelRatio||1, isMobile?1.5:2));
+const renderer=new THREE.WebGLRenderer({canvas, antialias:true, alpha:true, powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1, isMobile?2:2));
+renderer.setClearColor(0x000000,0);
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.24;
-renderer.shadowMap.enabled=!isMobile;
-renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMappingExposure=1.08;
 
 const scene=new THREE.Scene();
-scene.fog=new THREE.FogExp2(0x0a0d13, .0095);
-const camera=new THREE.PerspectiveCamera(34,1,.05,900);   /* longer lens — compressed, professional */
+scene.fog=new THREE.FogExp2(0x05070d, .017);
+const camera=new THREE.PerspectiveCamera(40,1,.1,400);
 
-/* ================= cinematic post stack ================= */
-const rtOpts={samples:isMobile?0:4, type:THREE.HalfFloatType};
-const composer=new EffectComposer(renderer, new THREE.WebGLRenderTarget(8,8,rtOpts));
+/* ---------- post: bloom + crisp grade (no DOF/AO — keep lines sharp) ---------- */
+const composer=new EffectComposer(renderer, new THREE.WebGLRenderTarget(8,8,{samples:isMobile?0:4, type:THREE.HalfFloatType}));
 composer.addPass(new RenderPass(scene,camera));
-
-/* GTAO — ground-truth ambient occlusion: contact shadows + depth that read as "rendered" */
-let gtao=null;
-if(!isMobile){
-  gtao=new GTAOPass(scene, camera, 8, 8);
-  gtao.output=GTAOPass.OUTPUT.Default;
-  gtao.updateGtaoMaterial({ radius:1.4, distanceExponent:1.0, thickness:1.4, scale:1.0, samples:16, distanceFallOff:1.0, screenSpaceRadius:false });
-  gtao.updatePdMaterial({ lumaPhi:10, depthPhi:2, normalPhi:3, radius:4, radiusExponent:1, rings:4, samples:16 });
-  composer.addPass(gtao);
-}
-
-const bloom=new UnrealBloomPass(new THREE.Vector2(8,8), .34, .28, .9);
+const bloom=new UnrealBloomPass(new THREE.Vector2(8,8), 0.5, 0.42, 0.34);
 composer.addPass(bloom);
-
-/* subtle depth-of-field — subject sharp, world falls off (focus tracked to camera→lookAt each frame) */
-let bokeh=null;
-if(!isMobile){
-  bokeh=new BokehPass(scene, camera, { focus:10.0, aperture:0.00055, maxblur:0.006 });
-  composer.addPass(bokeh);
-}
-
-/* final grade: filmic contrast, cool desaturation, vignette, grain, faint chromatic aberration */
-const GradeShader={
-  uniforms:{ tDiffuse:{value:null}, uTime:{value:0}, uVig:{value:1.0}, uGrain:{value:0.018},
-             uContrast:{value:1.05}, uSat:{value:0.92}, uCA:{value:0.0013} },
-  vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-  fragmentShader:`
-    varying vec2 vUv; uniform sampler2D tDiffuse; uniform float uTime,uVig,uGrain,uContrast,uSat,uCA;
-    float hash(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
-    void main(){
-      vec2 d=vUv-0.5;
-      /* chromatic aberration toward the edges */
-      vec2 ca=d*uCA;
-      vec3 col;
-      col.r=texture2D(tDiffuse,vUv+ca).r;
-      col.g=texture2D(tDiffuse,vUv).g;
-      col.b=texture2D(tDiffuse,vUv-ca).b;
-      /* contrast around mid + slight desaturation for the pro engineering grade */
-      col=(col-0.5)*uContrast+0.5;
-      float l=dot(col,vec3(0.2126,0.7152,0.0722));
-      col=mix(vec3(l),col,uSat);
-      /* cool the shadows a hair */
-      col.b+=(1.0-l)*0.015;
-      /* vignette */
-      float vig=smoothstep(0.98,0.34,length(d)*uVig);
-      col*=mix(0.74,1.0,vig);
-      /* fine film grain — modulated down in highlights so it doesn't sizzle */
-      float g=hash(floor(vUv*vec2(1600.0,900.0))+fract(uTime*0.6));
-      col+=(g-0.5)*uGrain*(1.0-0.6*l);
-      gl_FragColor=vec4(col,1.0);
-    }`
-};
-const gradePass=new ShaderPass(GradeShader);
-composer.addPass(gradePass);
+const GradeShader={ uniforms:{tDiffuse:{value:null},uTime:{value:0},uGrain:{value:0.02},uVig:{value:1.0},uCA:{value:0.0008}},
+  vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+  fragmentShader:`varying vec2 vUv;uniform sampler2D tDiffuse;uniform float uTime,uGrain,uVig,uCA;
+    float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
+    void main(){ vec2 d=vUv-0.5; vec2 ca=d*uCA; vec3 c;
+      c.r=texture2D(tDiffuse,vUv+ca).r; c.g=texture2D(tDiffuse,vUv).g; c.b=texture2D(tDiffuse,vUv-ca).b;
+      float l=dot(c,vec3(0.2126,0.7152,0.0722));
+      float vig=smoothstep(0.98,0.32,length(d)*uVig); c*=mix(0.72,1.0,vig);
+      float g=hash(floor(vUv*vec2(1600.0,900.0))+fract(uTime*0.7)); c+=(g-0.5)*uGrain*(1.0-0.6*l);
+      gl_FragColor=vec4(c,1.0);} `};
+const gradePass=new ShaderPass(GradeShader); composer.addPass(gradePass);
 composer.addPass(new OutputPass());
 
-/* ================= texture helpers ================= */
-function ctex(w,h,fn,o={}){
-  const c=document.createElement('canvas'); c.width=w; c.height=h;
-  fn(c.getContext('2d'),w,h);
-  const t=new THREE.CanvasTexture(c);
-  t.colorSpace=o.linear?THREE.NoColorSpace:THREE.SRGBColorSpace;
-  t.wrapS=t.wrapT=o.clamp?THREE.ClampToEdgeWrapping:THREE.RepeatWrapping;
-  if(o.rx||o.ry) t.repeat.set(o.rx||1,o.ry||1);
-  t.anisotropy=16;
-  return t;
-}
-function grain(x,w,h,n,aMin,aMax,dark=.5){ for(let i=0;i<n;i++){ const a=aMin+Math.random()*(aMax-aMin);
-  x.fillStyle=(Math.random()<dark)?`rgba(0,0,0,${a})`:`rgba(255,255,255,${a*.8})`;
-  const s=.6+Math.random()*1.8; x.fillRect(Math.random()*w,Math.random()*h,s,s); } }
-function blotch(x,w,h,n,col,aMin,aMax,rMin,rMax){ for(let i=0;i<n;i++){
-  const r=rMin+Math.random()*(rMax-rMin), gx=Math.random()*w, gy=Math.random()*h;
-  const g=x.createRadialGradient(gx,gy,0,gx,gy,r);
-  g.addColorStop(0,col.replace('$',(aMin+Math.random()*(aMax-aMin)).toFixed(3)));
-  g.addColorStop(1,col.replace('$','0'));
-  x.fillStyle=g; x.beginPath(); x.arc(gx,gy,r,0,Math.PI*2); x.fill(); } }
+/* ================= HOLO TOOLKIT ================= */
+const lineMats=[];
+function LM(color,widthPx,opacity){ const m=new LineMaterial({color,linewidth:widthPx,transparent:true,
+  opacity:opacity==null?1:opacity, worldUnits:false, depthTest:true, depthWrite:false});
+  m.resolution.set(innerWidth,innerHeight); lineMats.push(m); return m; }
+function poly(pts,mat){ const g=new LineGeometry(); const a=[]; for(const p of pts)a.push(p.x,p.y,p.z);
+  g.setPositions(a); const l=new Line2(g,mat); l.userData.pts=pts; return l; }
+function V(x,y,z){ return new THREE.Vector3(x,y,z||0); }
+function circleXY(r,seg,cx,cy){ const a=[]; for(let i=0;i<=seg;i++){const t=i/seg*TAU; a.push(V((cx||0)+Math.cos(t)*r,(cy||0)+Math.sin(t)*r,0));} return a; }
+function arcXY(r,a0,a1,seg,cx,cy){ const a=[]; for(let i=0;i<=seg;i++){const t=a0+(a1-a0)*i/seg; a.push(V((cx||0)+Math.cos(t)*r,(cy||0)+Math.sin(t)*r,0));} return a; }
+function rectXY(w,h,cx,cy){ const x=w/2,y=h/2; cx=cx||0; cy=cy||0;
+  return [V(cx-x,cy-y),V(cx+x,cy-y),V(cx+x,cy+y),V(cx-x,cy+y),V(cx-x,cy-y)]; }
+/* soft glow dot sprite */
+const dotTex=(()=>{ const c=document.createElement('canvas'); c.width=c.height=64; const x=c.getContext('2d');
+  const g=x.createRadialGradient(32,32,0,32,32,32); g.addColorStop(0,'rgba(255,255,255,1)');
+  g.addColorStop(.4,'rgba(255,255,255,.6)'); g.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=g; x.fillRect(0,0,64,64); const t=new THREE.CanvasTexture(c); return t; })();
+function dot(size,color,op){ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:dotTex,color,transparent:true,
+  opacity:op==null?0.85:op, blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false}));
+  s.scale.setScalar(size*0.42); return s; }
+function fillPanel(w,h,op){ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),
+  new THREE.MeshBasicMaterial({color:0x0b3a48,transparent:true,opacity:op==null?0.14:op,blending:THREE.AdditiveBlending,depthWrite:false}));
+  return m; }
+/* reveal a Line2 up to fraction f (crisp draw-in) */
+function setFrac(line,f){ const pts=line.userData.pts; if(!pts||pts.length<2)return;
+  const n=pts.length, fl=Math.max(0.0001,Math.min(1,f))*(n-1); const k=Math.floor(fl), fr=fl-k;
+  const out=[]; for(let i=0;i<=k&&i<n;i++)out.push(pts[i].x,pts[i].y,pts[i].z);
+  if(k<n-1){ const a=pts[k],b=pts[k+1]; out.push(a.x+(b.x-a.x)*fr,a.y+(b.y-a.y)*fr,a.z+(b.z-a.z)*fr); }
+  if(out.length>=6) line.geometry.setPositions(out); }
 
-/* ---- asphalt 4K ---- */
-const asphaltTex=ctex(2048,2048,(x,w,h)=>{
-  x.fillStyle='#232528'; x.fillRect(0,0,w,h);
-  blotch(x,w,h,60,'rgba(18,18,20,$)',.08,.2,80,340);
-  blotch(x,w,h,40,'rgba(58,58,62,$)',.04,.1,60,260);
-  grain(x,w,h,26000,.02,.09,.55);
-  for(let i=0;i<28;i++){ x.strokeStyle=`rgba(12,12,14,${.05+Math.random()*.09})`; x.lineWidth=1+Math.random()*2.5;
-    x.beginPath(); let px=Math.random()*w, py=Math.random()*h; x.moveTo(px,py);
-    for(let k=0;k<6;k++){ px+=(Math.random()-.5)*180; py+=(Math.random()-.5)*180; x.lineTo(px,py); } x.stroke(); }
-},{rx:1,ry:1});
-const asphaltRough=ctex(1024,1024,(x,w,h)=>{
-  x.fillStyle='#b8b8b8'; x.fillRect(0,0,w,h);
-  blotch(x,w,h,50,'rgba(70,70,70,$)',.12,.3,60,300); /* wheel-polish darker = smoother */
-  grain(x,w,h,9000,.03,.1,.5);
-},{linear:true});
-
-/* ---- ground / dusk grass-dirt 2K ---- */
-const groundTex=ctex(2048,2048,(x,w,h)=>{
-  x.fillStyle='#15150f'; x.fillRect(0,0,w,h);
-  blotch(x,w,h,110,'rgba(36,37,24,$)',.12,.3,50,260);
-  blotch(x,w,h,90,'rgba(12,10,8,$)',.15,.4,50,300);
-  blotch(x,w,h,44,'rgba(48,42,26,$)',.05,.14,30,120);
-  for(let i=0;i<900;i++){ /* mottled scrub clumps */
-    const gx=Math.random()*w, gy=Math.random()*h, r=3+Math.random()*10;
-    x.fillStyle=`rgba(${18+Math.random()*22|0},${20+Math.random()*20|0},${10+Math.random()*12|0},${.25+Math.random()*.35})`;
-    x.beginPath(); x.arc(gx,gy,r,0,Math.PI*2); x.fill(); }
-  grain(x,w,h,24000,.03,.1,.55);
-},{rx:90,ry:90});
-
-/* ---- gravel shoulder ---- */
-const gravelTex=ctex(1024,1024,(x,w,h)=>{
-  x.fillStyle='#2c2a26'; x.fillRect(0,0,w,h);
-  for(let i=0;i<4200;i++){ const s=1+Math.random()*3.4;
-    const g=90+Math.random()*70|0, t=g-20+Math.random()*22|0;
-    x.fillStyle=`rgba(${g},${g-4},${t},${.25+Math.random()*.5})`;
-    x.beginPath(); x.ellipse(Math.random()*w,Math.random()*h,s,s*(.6+Math.random()*.5),Math.random()*3,0,Math.PI*2); x.fill(); }
-  grain(x,w,h,7000,.03,.1,.6);
-},{rx:8,ry:180});
-
-/* ---- concrete curb ---- */
-const curbTex=ctex(1024,256,(x,w,h)=>{
-  x.fillStyle='#6d6a63'; x.fillRect(0,0,w,h);
-  blotch(x,w,h,40,'rgba(50,48,44,$)',.08,.2,20,90);
-  grain(x,w,h,6000,.02,.1,.5);
-  x.fillStyle='rgba(30,28,26,.55)';
-  for(let gx=0;gx<w;gx+=128){ x.fillRect(gx,0,2.5,h); }
-},{rx:40,ry:1});
-
-/* ---- wood (poles + desk) ---- */
-const poleWoodTex=ctex(512,2048,(x,w,h)=>{
-  x.fillStyle='#4a3d30'; x.fillRect(0,0,w,h);
-  for(let i=0;i<420;i++){ const gx=Math.random()*w, gw=1+Math.random()*3, gy=Math.random()*h, gh=60+Math.random()*400;
-    x.fillStyle=`rgba(${26+Math.random()*34|0},${20+Math.random()*26|0},${14+Math.random()*18|0},${.14+Math.random()*.26})`;
-    x.fillRect(gx,gy,gw,gh); }
-  for(let i=0;i<26;i++){ x.fillStyle=`rgba(16,12,9,${.3+Math.random()*.3})`;
-    x.fillRect(Math.random()*w,Math.random()*h,1.6+Math.random()*2,140+Math.random()*520); } /* checking cracks */
-  blotch(x,w,h,26,'rgba(72,66,54,$)',.06,.14,30,140);
-},{rx:1,ry:1});
-const deskWoodTex=ctex(2048,1024,(x,w,h)=>{
-  x.fillStyle='#3d2f24'; x.fillRect(0,0,w,h);
-  for(let i=0;i<300;i++){ const gy=Math.random()*h, gh=1+Math.random()*3.2, gx=Math.random()*w, gw=140+Math.random()*700;
-    x.fillStyle=`rgba(${30+Math.random()*36|0},${22+Math.random()*24|0},${15+Math.random()*16|0},${.14+Math.random()*.28})`;
-    x.fillRect(gx,gy,gw,gh); }
-  for(let i=0;i<14;i++){ /* cathedral grain arcs */
-    x.strokeStyle=`rgba(24,17,12,${.12+Math.random()*.16})`; x.lineWidth=1+Math.random()*2;
-    x.beginPath(); const cy=Math.random()*h, cx=Math.random()*w;
-    x.ellipse(cx,cy,120+Math.random()*260,10+Math.random()*26,0,0,Math.PI*2); x.stroke(); }
-  blotch(x,w,h,20,'rgba(80,62,44,$)',.05,.1,60,220);
-  grain(x,w,h,5000,.015,.05,.5);
-});
-
-/* ---- galvanized / brushed metal ---- */
-const galvTex=ctex(1024,1024,(x,w,h)=>{
-  x.fillStyle='#8b9299'; x.fillRect(0,0,w,h);
-  for(let i=0;i<160;i++){ /* spangle */
-    const gx=Math.random()*w, gy=Math.random()*h, r=8+Math.random()*36;
-    x.fillStyle=`rgba(${150+Math.random()*50|0},${155+Math.random()*45|0},${160+Math.random()*40|0},${.08+Math.random()*.14})`;
-    x.beginPath(); x.moveTo(gx+r,gy);
-    for(let k=1;k<=6;k++){ const a=k/6*Math.PI*2; x.lineTo(gx+Math.cos(a)*r*(.7+Math.random()*.5),gy+Math.sin(a)*r*(.7+Math.random()*.5)); }
-    x.fill(); }
-  blotch(x,w,h,30,'rgba(70,76,84,$)',.06,.16,30,140);
-  grain(x,w,h,7000,.02,.06,.5);
-});
-
-/* ---- paper: 4K plan sheet w/ route linework ---- */
-/* sheet local: x in [-.62,.62], z in [-.44,.44]  → uv */
-const SHEET_W=1.24, SHEET_D=.88;
-const sheetPath=[ /* desk-local x,z — the drawn route across the sheet (smooth S) */
-  [-.56,.30],[-.38,.24],[-.20,.26],[-.04,.16],[.10,.02],[.22,-.10],[.38,-.16],[.52,-.14]
-];
-function sheetToUV(p){ return [ (p[0]+SHEET_W/2)/SHEET_W, (p[1]+SHEET_D/2)/SHEET_D ]; }
-const planTex=ctex(4096,Math.round(4096*SHEET_D/SHEET_W),(x,w,h)=>{
-  x.fillStyle='#d8d2c2'; x.fillRect(0,0,w,h);
-  blotch(x,w,h,26,'rgba(178,168,148,$)',.1,.2,120,420);
-  grain(x,w,h,26000,.01,.035,.5);
-  const U=p=>{ const uv=sheetToUV(p); return [uv[0]*w,(1-uv[1])*h]; };
-  /* border + title block */
-  x.strokeStyle='#4b4640'; x.lineWidth=16; x.strokeRect(46,46,w-92,h-92);
-  x.lineWidth=5; x.strokeRect(80,80,w-160,h-160);
-  const tbW=920, tbH=360, tbX=w-66-tbW, tbY=h-66-tbH;
-  x.strokeStyle='#4b4640'; x.lineWidth=3; x.strokeRect(tbX,tbY,tbW,tbH);
-  x.fillStyle='#14161a'; x.font='800 84px Montserrat, Arial'; x.textAlign='left';
-  x.fillText('DRAF',tbX+40,tbY+110);
-  x.fillStyle='#0b8ba0'; x.fillText('TECH',tbX+40+x.measureText('DRAF').width,tbY+110);
-  x.fillStyle='#5a544c'; x.font='600 34px Arial';
-  x.fillText('OSP PLAN & PROFILE',tbX+40,tbY+170);
-  x.font='500 27px Arial';
-  x.fillText('SHEET OSP-04 · SCALE 1" = 40\'',tbX+40,tbY+218);
-  for(let r=0;r<3;r++){ x.strokeStyle='#8a847a'; x.lineWidth=1.6; x.strokeRect(tbX+40,tbY+244+r*34,tbW-80,26); }
-  /* north arrow + bar scale */
-  x.save(); x.translate(w-200,190); x.strokeStyle='#4b4640'; x.lineWidth=4;
-  x.beginPath(); x.arc(0,0,64,0,Math.PI*2); x.stroke();
-  x.fillStyle='#4b4640'; x.beginPath(); x.moveTo(0,-52); x.lineTo(16,18); x.lineTo(0,6); x.lineTo(-16,18); x.closePath(); x.fill();
-  x.restore();
-  x.fillStyle='#4b4640'; for(let k=0;k<4;k++){ x.fillRect(150+k*90,150,k%2?90:0,14); x.strokeRect(150+k*90,150,90,14); }
-  /* parcel linework */
-  x.strokeStyle='rgba(88,84,76,.8)'; x.lineWidth=6;
-  for(let i=0;i<30;i++){ const rx=140+Math.random()*(w-1300), ry=180+Math.random()*(h-760),
-    rw=150+Math.random()*440, rh=110+Math.random()*320;
-    x.strokeRect(rx,ry,rw,rh); }
-  /* secondary lot lines */
-  x.strokeStyle='rgba(110,105,96,.55)'; x.lineWidth=3.5;
-  for(let i=0;i<40;i++){ const rx=140+Math.random()*(w-1300), ry=180+Math.random()*(h-760);
-    x.beginPath(); x.moveTo(rx,ry); x.lineTo(rx+(Math.random()-.5)*500,ry+(Math.random()-.5)*360); x.stroke(); }
-  /* corridor centerline (dashed) roughly parallel to route */
-  x.setLineDash([54,34]); x.strokeStyle='rgba(66,62,56,.95)'; x.lineWidth=9;
-  x.beginPath(); sheetPath.forEach((p,i)=>{ const q=U([p[0],p[1]-.07]); i?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1]); }); x.stroke();
-  x.setLineDash([]);
-  /* profile grid strip at bottom-left */
-  x.strokeStyle='rgba(120,114,104,.6)'; x.lineWidth=3.5;
-  for(let gx=140;gx<tbX-90;gx+=72) { x.beginPath(); x.moveTo(gx,h-160); x.lineTo(gx,h-420); x.stroke(); }
-  for(let gy=h-420;gy<=h-160;gy+=52){ x.beginPath(); x.moveTo(140,gy); x.lineTo(tbX-90,gy); x.stroke(); }
-  x.strokeStyle='rgba(66,62,56,.95)'; x.lineWidth=8;
-  x.beginPath(); for(let gx=140;gx<=tbX-90;gx+=24){ x.lineTo(gx,h-290+Math.sin(gx*.004)*58); } x.stroke();
-  /* THE ROUTE — glowing cyan polyline w/ station ticks + node symbols */
-  const rpx=sheetPath.map(U);
-  x.lineJoin='round'; x.lineCap='round';
-  x.shadowColor='rgba(0,220,245,.9)'; x.shadowBlur=48;
-  x.strokeStyle='#6be8fa'; x.lineWidth=22;
-  x.beginPath(); rpx.forEach((q,i)=>i?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1])); x.stroke();
-  x.shadowBlur=0; x.strokeStyle='#e6fdff'; x.lineWidth=8;
-  x.beginPath(); rpx.forEach((q,i)=>i?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1])); x.stroke();
-  /* ticks + nodes */
-  x.strokeStyle='rgba(0,190,215,.95)'; x.lineWidth=9;
-  for(let i=1;i<rpx.length-1;i++){ const a=rpx[i-1], b=rpx[i+1];
-    const dx=b[0]-a[0], dy=b[1]-a[1], L=Math.hypot(dx,dy), nx=-dy/L, ny=dx/L;
-    x.beginPath(); x.moveTo(rpx[i][0]-nx*38,rpx[i][1]-ny*38); x.lineTo(rpx[i][0]+nx*38,rpx[i][1]+ny*38); x.stroke(); }
-  x.fillStyle='rgba(0,210,235,.95)';
-  for(const i of [1,3,5,7]){ x.save(); x.translate(rpx[i][0],rpx[i][1]); x.rotate(Math.PI/4);
-    x.fillRect(-22,-22,44,44); x.restore(); }
-},{clamp:true});
-
-/* ---- tree billboard (feathered dusk silhouette) ---- */
-const treeTex=ctex(1024,1024,(x,w,h)=>{
-  x.clearRect(0,0,w,h);
-  const cx=w/2;
-  /* trunk */
-  const tg=x.createLinearGradient(0,h*.5,0,h);
-  tg.addColorStop(0,'rgba(20,18,14,.95)'); tg.addColorStop(1,'rgba(12,11,9,.98)');
-  x.fillStyle=tg;
-  x.beginPath(); x.moveTo(cx-10,h); x.quadraticCurveTo(cx-8,h*.62,cx-4,h*.5);
-  x.lineTo(cx+4,h*.5); x.quadraticCurveTo(cx+8,h*.62,cx+10,h); x.closePath(); x.fill();
-  /* limbs */
-  x.strokeStyle='rgba(16,15,12,.9)'; x.lineCap='round';
-  for(let i=0;i<7;i++){ x.lineWidth=3+Math.random()*5;
-    const sy=h*(.34+Math.random()*.2);
-    x.beginPath(); x.moveTo(cx,sy);
-    x.quadraticCurveTo(cx+(Math.random()-.5)*160, sy-40-Math.random()*80, cx+(Math.random()-.5)*420, sy-90-Math.random()*160); x.stroke(); }
-  /* feathered canopy — many soft radial blobs */
-  for(let i=0;i<230;i++){
-    const ang=Math.random()*Math.PI*2, rad=Math.pow(Math.random(),.6)*w*.32;
-    const gx=cx+Math.cos(ang)*rad, gy=h*.30+Math.sin(ang)*rad*.62;
-    const r=14+Math.random()*46;
-    const dc=13+Math.random()*11|0;
-    const gg=x.createRadialGradient(gx,gy,0,gx,gy,r);
-    gg.addColorStop(0,`rgba(${dc},${dc+5},${dc},${.5+Math.random()*.35})`);
-    gg.addColorStop(1,`rgba(${dc},${dc+5},${dc},0)`);
-    x.fillStyle=gg; x.beginPath(); x.arc(gx,gy,r,0,Math.PI*2); x.fill();
-  }
-  /* faint warm rim on sunset side */
-  for(let i=0;i<40;i++){
-    const ang=-.7+Math.random()*1.1, rad=w*.26+Math.random()*w*.07;
-    const gx=cx+Math.cos(ang)*rad, gy=h*.30+Math.sin(ang)*rad*.62;
-    const gg=x.createRadialGradient(gx,gy,0,gx,gy,12);
-    gg.addColorStop(0,'rgba(120,70,40,.16)'); gg.addColorStop(1,'rgba(120,70,40,0)');
-    x.fillStyle=gg; x.beginPath(); x.arc(gx,gy,12,0,Math.PI*2); x.fill();
-  }
-},{clamp:true});
-
-/* ---- grass tuft ---- */
-const tuftTex=ctex(256,256,(x,w,h)=>{
-  x.clearRect(0,0,w,h);
-  for(let i=0;i<48;i++){ const bx=w*.5+(Math.random()-.5)*w*.7;
-    const g=40+Math.random()*40|0;
-    x.strokeStyle=`rgba(${g+16},${g+20},${g-6},${.5+Math.random()*.4})`; x.lineWidth=2+Math.random()*2.4;
-    x.beginPath(); x.moveTo(bx,h);
-    x.quadraticCurveTo(bx+(Math.random()-.5)*36, h*.5, bx+(Math.random()-.5)*70, h*(.04+Math.random()*.3)); x.stroke(); }
-},{clamp:true});
-
-/* ---- streetlight pool decal — neutral 4000K LED white ---- */
-const poolTex=ctex(512,512,(x,w,h)=>{
-  const g=x.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);
-  g.addColorStop(0,'rgba(235,240,244,.5)'); g.addColorStop(.5,'rgba(220,228,236,.16)'); g.addColorStop(1,'rgba(210,220,232,0)');
-  x.fillStyle=g; x.fillRect(0,0,w,h);
-},{clamp:true});
-
-/* ================= sky ================= */
+/* ================= GRID VOID ================= */
 {
-  const sky=ctex(2048,1024,(x,w,h)=>{
-    /* BLUE-HOUR OVERCAST — professional engineering-film grade. Sphere v=.5 is the horizon. */
-    const g=x.createLinearGradient(0,0,0,h);
-    g.addColorStop(0,'#04060c');  g.addColorStop(.24,'#080d18'); g.addColorStop(.38,'#101827');
-    g.addColorStop(.455,'#1d2836'); g.addColorStop(.487,'#33414f'); g.addColorStop(.5,'#4a5866');
-    g.addColorStop(.53,'#232c37'); g.addColorStop(.62,'#0d1119'); g.addColorStop(1,'#07080d');
-    x.fillStyle=g; x.fillRect(0,0,w,h);
-    /* faint cold remnant glow at one azimuth — barely-there, desaturated */
-    const sx=w*.68, sy=h*.5;
-    const rg=x.createRadialGradient(sx,sy,0,sx,sy,w*.17);
-    rg.addColorStop(0,'rgba(178,196,212,.34)'); rg.addColorStop(.4,'rgba(140,158,176,.14)'); rg.addColorStop(1,'rgba(120,140,160,0)');
-    x.fillStyle=rg;
-    x.save(); x.translate(sx,sy); x.scale(1,.3); x.translate(-sx,-sy);
-    x.fillRect(0,0,w,h); x.restore();
-    /* soft overcast cloud deck above the horizon band */
-    for(let i=0;i<11;i++){ const cy=h*(.40+Math.random()*.07), cw=w*(.1+Math.random()*.24), ch=3+Math.random()*8;
-      const cxp=Math.random()*w, alpha=.08+Math.random()*.1;
-      const cg=x.createLinearGradient(0,cy-ch,0,cy+ch);
-      cg.addColorStop(0,`rgba(10,14,22,${alpha})`); cg.addColorStop(.7,`rgba(56,68,82,${alpha*.9})`); cg.addColorStop(1,'rgba(0,0,0,0)');
-      x.fillStyle=cg;
-      x.beginPath(); x.ellipse(cxp,cy,cw,ch,0,0,Math.PI*2); x.fill();
-      x.beginPath(); x.ellipse(cxp+cw*.38,cy+ch*.5,cw*.5,ch*.65,0,0,Math.PI*2); x.fill(); }
-    /* sparse dim stars breaking through */
-    for(let i=0;i<230;i++){ const sy2=Math.random()*h*.26;
-      x.fillStyle=`rgba(225,235,245,${.08+Math.random()*.3})`;
-      x.fillRect(Math.random()*w,sy2,1.3,1.3); }
-  });
-  const dome=new THREE.Mesh(new THREE.SphereGeometry(760,48,32),
-    new THREE.MeshBasicMaterial({map:sky, side:THREE.BackSide, fog:false}));
-  dome.rotation.y=0;   /* sunset hotspot natively lands ahead-right of the corridor (-z,+x) */
-  scene.add(dome);
-  /* environment reflections from the sky itself */
-  const pmrem=new THREE.PMREMGenerator(renderer);
-  const envScene=new THREE.Scene(); envScene.add(dome.clone());
-  scene.environment=pmrem.fromScene(envScene,.04).texture;
-  scene.environmentIntensity=.42;
+  const gmat=new THREE.ShaderMaterial({ transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+    uniforms:{ uColor:{value:new THREE.Color(0x0c4a5e)}, uCenter:{value:new THREE.Vector2()}, uFade:{value:64.0} },
+    vertexShader:`varying vec3 vW; void main(){ vW=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} `,
+    fragmentShader:`varying vec3 vW; uniform vec3 uColor; uniform vec2 uCenter; uniform float uFade;
+      float gl(vec2 p,float c){ vec2 g=abs(fract(p/c-0.5)-0.5)/fwidth(p/c); float l=min(g.x,g.y); return 1.0-min(l,1.0);}
+      void main(){ float m1=gl(vW.xz,2.0)*0.42; float m2=gl(vW.xz,10.0)*0.9;
+        float d=length(vW.xz-uCenter); float fade=smoothstep(uFade,uFade*0.18,d);
+        float a=(m1+m2)*fade; if(a<0.002)discard; gl_FragColor=vec4(uColor*(0.7+m2),a);} `});
+  const grid=new THREE.Mesh(new THREE.PlaneGeometry(600,600), gmat);
+  grid.rotation.x=-Math.PI/2; scene.add(grid);
+  window.__grid={mesh:grid, mat:gmat};
+}
+/* far atmosphere: slow faint wireframe horizon rings + particle motes */
+{
+  for(let i=0;i<3;i++){ const r=poly(circleXY(70+i*26,120), LM(0x0a3a4a, 1.0, 0.5-i*0.12));
+    r.rotation.x=-Math.PI/2; r.position.y=0.02; scene.add(r); }
+  const N=520, a=new Float32Array(N*3);
+  for(let i=0;i<N;i++){ a[i*3]=(Math.random()-.5)*240; a[i*3+1]=Math.random()*34-2; a[i*3+2]=-Math.random()*150+20; }
+  const pg=new THREE.BufferGeometry(); pg.setAttribute('position',new THREE.BufferAttribute(a,3));
+  const motes=new THREE.Points(pg,new THREE.PointsMaterial({color:0x2aa7c4,size:0.14,transparent:true,opacity:0.5,
+    blending:THREE.AdditiveBlending,depthWrite:false})); scene.add(motes);
 }
 
-/* ================= lights ================= */
-scene.add(new THREE.HemisphereLight(0x39485a, 0x0b0d12, .72));
-const sun=new THREE.DirectionalLight(0xcfdcec, .95);           /* high cool overcast key */
-sun.position.set(38,52,-26);
-sun.castShadow=!isMobile;
-sun.shadow.mapSize.set(4096,4096);
-sun.shadow.camera.left=-22; sun.shadow.camera.right=22;
-sun.shadow.camera.top=22;  sun.shadow.camera.bottom=-22;
-sun.shadow.camera.near=2;  sun.shadow.camera.far=220;
-sun.shadow.bias=-.0004; sun.shadow.normalBias=.02;
-scene.add(sun); scene.add(sun.target);
-const coolFill=new THREE.DirectionalLight(0x2b3a4c,.4); coolFill.position.set(-40,50,30); scene.add(coolFill);
-
-/* ================= route ================= */
-/* world route: desk (elevated) → curb line → corridor with S-curves → up wireless pole → work zone */
-const DESK=new THREE.Vector3(-6.4,0,8);      /* desk anchor near route start, off the shoulder */
-const DESK_H=.94;
-function corridorX(z){ return Math.sin(z*-.011)*9 + Math.sin(z*-.0042)*14; } /* smooth S along -z */
-/* line runs at curb offset; road center = line shifted left by ROAD_OFF */
-const ROAD_OFF=3.85;
-
-/* main ground control points (z from 0 → -560) */
-const groundPts=[];
-for(let z=0; z>=-560; z-=14){ groundPts.push(new THREE.Vector3(corridorX(z), .045, z)); }
-
-/* stitched full-route control points */
-const ctrl=[];
-/* on-sheet (desk-local → world): sheet lies on desk top, rotated toward road */
-const deskYaw=-.52;
-function deskLocal(px,pz,py=0){
-  const v=new THREE.Vector3(px,py,pz);
-  v.applyAxisAngle(new THREE.Vector3(0,1,0),deskYaw);
-  return v.add(new THREE.Vector3(DESK.x,DESK_H+.026,DESK.z));
-}
-sheetPath.forEach(p=>ctrl.push(deskLocal(p[0],-p[1])));           /* across the paper */
-ctrl.push(deskLocal(.72,-(-.14)*0-.14*0-0.10,-.0));               /* off sheet edge */
-ctrl.push(new THREE.Vector3(DESK.x+1.5,DESK_H*.55,DESK.z-1.4));   /* spill off desk */
-ctrl.push(new THREE.Vector3(DESK.x+3.2,.06,DESK.z-3.2));          /* touch down */
-ctrl.push(new THREE.Vector3(corridorX(2)+0,.05,2));               /* join curb */
-groundPts.forEach(p=>ctrl.push(p.clone()));
-const route=new THREE.CatmullRomCurve3(ctrl,false,'catmullrom',.32);
-const rp=t=>route.getPointAt(Math.min(.99995,Math.max(0,t)));
-const rt=t=>route.getTangentAt(Math.min(.99995,Math.max(0,t)));
-const sideOf=t=>{ const g=rt(t); return new THREE.Vector3(-g.z,0,g.x).normalize(); };
-
-/* find route t for a given world z on the corridor (approx, corridor only) */
-function tForZ(zTarget){
-  let lo=0, hi=1;
-  for(let i=0;i<40;i++){ const mid=(lo+hi)/2; (rp(mid).z>zTarget)?lo=mid:hi=mid; }
-  return (lo+hi)/2;
-}
+/* ================= ROUTE ================= */
+const CTRL=[];
+for(let i=0;i<=15;i++){ const z=-i*7.4; const x=Math.sin(i*0.52)*3.4 + Math.sin(i*0.2)*1.7; CTRL.push(V(x,0.14,z)); }
+const route=new THREE.CatmullRomCurve3(CTRL,false,'catmullrom',0.4);
+const rp=t=>route.getPointAt(Math.min(.9999,Math.max(0,t)));
+const rt=t=>route.getTangentAt(Math.min(.9999,Math.max(0,t)));
+const sideOf=t=>{ const g=rt(t); return V(-g.z,0,g.x).normalize(); };
+/* hero route line + wider soft glow underlay + node pucks */
+const routePts=[]; for(let i=0;i<=340;i++) routePts.push(rp(i/340));
+scene.add(poly(routePts, LM(0x0aa6c8, 9, 0.16)));   /* soft wide underlay */
+const routeLine=poly(routePts, LM(CY_HOT, 3.4, 1.0)); scene.add(routeLine);
+for(let i=0;i<=12;i++){ const p=rp(i/12); const d=dot(1.5,CY); d.position.copy(p); d.position.y=0.16; scene.add(d);
+  const rr=poly(circleXY(0.5,36), LM(CY,1.6,0.7)); rr.rotation.x=-Math.PI/2; rr.position.copy(p); rr.position.y=0.03; scene.add(rr); }
+/* travelling pulses */
+const pulses=[]; for(let i=0;i<3;i++){ const d=dot(2.6,CY_HOT); scene.add(d); pulses.push({d,o:i/3}); }
 
 /* ================= STOPS ================= */
-/* Real project lifecycle: survey → design → engineer → permit → build the air layer → as-built record */
+const EMY=2.7;
 const STOPS=[
-  {key:'open',   kick:'',                                title:'',                             sub:'', tags:[], z:null,  t:.008},
-  {key:'survey', kick:'Field Survey & Data Collection',  title:'Field Survey & Data Collection',
+  {key:'open',   t:0.03, kick:'',                               title:'', sub:'', tags:[]},
+  {key:'survey', t:0.17, kick:'Field Survey & Data Collection', title:'Field Survey & Data Collection',
     sub:'Ground truth first — crews capture the real corridor before a single line is final.',
-    tags:['GPS / GIS walkouts','Pole data','Field photos'], z:-72},
-  {key:'fiber',  kick:'Fiber Network Design',            title:'Fiber Network Design',
+    tags:['GPS / GIS walkouts','Pole data','Field photos']},
+  {key:'fiber',  t:0.32, kick:'Fiber Network Design', title:'Fiber Network Design',
     sub:'Backbone, laterals and the last drop — the whole neighborhood, engineered as one network.',
-    tags:['FTTH / FTTx','HLD & LLD','BEAD engineering'], z:-160},
-  {key:'osp',    kick:'OSP Engineering',                 title:'OSP Engineering',
+    tags:['FTTH / FTTx','HLD & LLD','BEAD engineering']},
+  {key:'osp',    t:0.47, kick:'OSP Engineering', title:'OSP Engineering',
     sub:'Handholes, cabinets, conduit and poles — plant engineered to carrier spec and code.',
-    tags:['Make-ready','Pole loading','Splice design'], z:-252},
-  {key:'permit', kick:'Permitting & Regulatory',         title:'Permitting & Regulatory',
+    tags:['Make-ready','Pole loading','Splice design']},
+  {key:'permit', t:0.62, kick:'Permitting & Regulatory', title:'Permitting & Regulatory',
     sub:'Before anything is built, the route is made legal — permitted, staged and cleared.',
-    tags:['ROW permits','DOT / municipal','MOT plans'], z:-336},
-  {key:'wifi',   kick:'Wireless Engineering',            title:'Wireless Engineering',
+    tags:['ROW permits','DOT / municipal','MOT plans']},
+  {key:'wifi',   t:0.77, kick:'Wireless Engineering', title:'Wireless Engineering',
     sub:'The build reaches the air — sites designed, towers analyzed, backhaul engineered.',
-    tags:['Small cell','TIA-222 structural','DAS & backhaul'], z:-416},
-  {key:'cad',    kick:'CAD / GIS & As-Built',            title:'CAD / GIS & As-Built',
+    tags:['Small cell','TIA-222 structural','DAS & backhaul']},
+  {key:'cad',    t:0.93, kick:'CAD / GIS & As-Built', title:'CAD / GIS & As-Built',
     sub:'The built world becomes the record — the route returns to the desk as one source of truth.',
-    tags:['AutoCAD','ArcGIS / 3GIS','Redlines → As-builts'], z:-500},
+    tags:['AutoCAD','ArcGIS / 3GIS','Redlines → As-builts']},
 ];
-STOPS.forEach(s=>{ if(s.z!==null) s.t=tForZ(s.z); });
 
-/* ================= route tube + pulse ================= */
-/* variable-radius tube: hair-thin on the paper, full-bodied on the ground */
-let tDeskEnd=.02;
-{ for(let t=0;t<.1;t+=.002){ if(rp(t).y<.2){ tDeskEnd=t; break; } } }
-function varTube(curve,segs,radial,radFn){
-  const fr=curve.computeFrenetFrames(segs,false);
-  const pos=[],nrm=[],uv=[],idx=[];
-  for(let i=0;i<=segs;i++){
-    const t=i/segs, P=curve.getPointAt(t), N=fr.normals[i], B=fr.binormals[i], r=radFn(t);
-    for(let j=0;j<=radial;j++){
-      const v=j/radial*Math.PI*2, sin=Math.sin(v), cos=Math.cos(v);
-      const nx=N.x*cos+B.x*sin, ny=N.y*cos+B.y*sin, nz=N.z*cos+B.z*sin;
-      pos.push(P.x+nx*r,P.y+ny*r,P.z+nz*r); nrm.push(nx,ny,nz); uv.push(t,j/radial);
-    }
-  }
-  for(let i=0;i<segs;i++) for(let j=0;j<radial;j++){
-    const a=i*(radial+1)+j, b=a+radial+1;
-    idx.push(a,b,a+1, b,b+1,a+1);
-  }
-  const g=new THREE.BufferGeometry();
-  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
-  g.setAttribute('normal',new THREE.Float32BufferAttribute(nrm,3));
-  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
-  g.setIndex(idx);
-  return g;
-}
-const smoothstepJS=(a,b,x)=>{ const u=Math.max(0,Math.min(1,(x-a)/(b-a))); return u*u*(3-2*u); };
-let routeShader=null;
-{
-  const geo=varTube(route, 1700, 10, t=> .006 + (.034-.006)*smoothstepJS(tDeskEnd*.55, tDeskEnd*1.3, t));
-  const mat=new THREE.MeshStandardMaterial({color:0x02181c, roughness:.4, metalness:0,
-    emissive:new THREE.Color(0x00d5ee), emissiveIntensity:1.35});
-  mat.onBeforeCompile=sh=>{
-    sh.uniforms.uTime={value:0};
-    sh.vertexShader=sh.vertexShader
-      .replace('#include <common>','#include <common>\nvarying vec2 vTubeUv;')
-      .replace('#include <uv_vertex>','#include <uv_vertex>\nvTubeUv=uv;');
-    sh.fragmentShader=sh.fragmentShader
-      .replace('#include <common>','#include <common>\nvarying vec2 vTubeUv;\nuniform float uTime;')
-      .replace('#include <emissivemap_fragment>',
-        `#include <emissivemap_fragment>
-        float w1=smoothstep(.028,.0,abs(fract(vTubeUv.x - uTime*.045)-.5)-.472);
-        float w2=smoothstep(.05,.0,abs(fract(vTubeUv.x*3.0 - uTime*.11)-.5)-.45);
-        float breathe=.88+.12*sin(uTime*1.6);
-        totalEmissiveRadiance*= (breathe + w1*1.5 + w2*.4);`);
-    routeShader=sh;
-  };
-  const tube=new THREE.Mesh(geo,mat);
-  scene.add(tube);
-}
-/* node pucks along corridor */
-{
-  const puckGeo=new THREE.CylinderGeometry(.16,.19,.035,24);
-  const puckMat=new THREE.MeshStandardMaterial({color:0x1b2226, roughness:.55, metalness:.25,
-    emissive:0x00c8e0, emissiveIntensity:1.4});
-  const zs=[]; for(let z=-30; z>=-540; z-=42) zs.push(z);
-  const inst=new THREE.InstancedMesh(puckGeo,puckMat,zs.length);
-  const d=new THREE.Object3D();
-  zs.forEach((z,i)=>{ const t=tForZ(z), p=rp(t);
-    d.position.set(p.x,.02,p.z); d.updateMatrix(); inst.setMatrixAt(i,d.matrix); });
-  inst.instanceMatrix.needsUpdate=true;
-  scene.add(inst);
+const SCENES={};
+function place(key, buildFn){
+  const S=STOPS.find(s=>s.key===key), t=S.t, P=rp(t), TAN=rt(t), SD=sideOf(t);
+  const g=new THREE.Group(); g.position.set(P.x,0,P.z); scene.add(g);
+  const camPos=P.clone().addScaledVector(TAN,-8.6).add(V(0,3.1,0)).addScaledVector(SD,1.9);
+  const lookAt=V(P.x, EMY, P.z);
+  g.rotation.y=Math.atan2(camPos.x-P.x, camPos.z-P.z);   /* billboard around Y toward camera */
+  /* connector stem from the route node up to the emblem */
+  const stem=poly([V(0,0.14,0),V(0,EMY-1.7,0)], LM(CY,1.4,0.5)); g.add(stem);
+  g.add(dot(1.3,CY_HOT)); /* base node at route */
+  const api=buildFn(g)||{};
+  SCENES[key]={group:g, camPos, lookAt, update:api.update||(()=>{})};
 }
 
-/* ================= road + curb + shoulder ================= */
-function ribbon(offA, offB, y, tex, roughMap, rough, texRepeatAlong){
-  const N=520, pos=[], uv=[], idx=[];
-  for(let i=0;i<=N;i++){
-    const t=i/N, tt=.10+t*.90;                       /* corridor part of the curve only */
-    const p=rp(tt), s=sideOf(tt);
-    const a=p.clone().addScaledVector(s,offA), b=p.clone().addScaledVector(s,offB);
-    pos.push(a.x,y,a.z, b.x,y,b.z);
-    uv.push(0,t*texRepeatAlong, 1,t*texRepeatAlong);
-  }
-  for(let i=0;i<N;i++){ const a=i*2,b=a+1,c=a+2,e=a+3; idx.push(a,b,c,b,e,c); }
-  const g=new THREE.BufferGeometry();
-  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
-  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
-  g.setIndex(idx); g.computeVertexNormals();
-  const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({map:tex, roughnessMap:roughMap||null, roughness:rough, metalness:.02}));
-  m.receiveShadow=true;
-  scene.add(m);
-  return m;
-}
-/* ground plane */
-{
-  const g=new THREE.Mesh(new THREE.PlaneGeometry(1500,1500,1,1),
-    new THREE.MeshStandardMaterial({map:groundTex, color:0x9a948a, roughness:1, metalness:0, envMapIntensity:.15}));
-  g.rotation.x=-Math.PI/2; g.position.set(0,-.03,-270); g.receiveShadow=true; scene.add(g);
-}
-/* road lane markings baked into a 1024-wide strip texture */
-const roadStripTex=ctex(1024,1024,(x,w,h)=>{
-  x.drawImage(asphaltTex.image,0,0,2048,2048,0,0,w,h);
-  /* double yellow center */
-  x.fillStyle='rgba(196,158,60,.82)'; x.fillRect(w*.485,0,7,h); x.fillRect(w*.515,0,7,h);
-  blotch(x,w,h,10,'rgba(20,20,22,$)',.1,.2,40,140);
-  /* white edge lines */
-  x.fillStyle='rgba(205,205,200,.75)'; x.fillRect(w*.055,0,9,h); x.fillRect(w*.935,0,9,h);
-  grain(x,w,h,3000,.02,.06,.6);
-},{ry:56});
-ribbon(-ROAD_OFF-3.45, -ROAD_OFF+3.45, .012, roadStripTex, asphaltRough, .55, 56);   /* road — low rough picks up dusk sky sheen */
-ribbon(-ROAD_OFF+3.45, -ROAD_OFF+3.78, .07, curbTex, null, .9, 130);                 /* curb top */
-ribbon(-ROAD_OFF+3.78, 1.7,  .002, gravelTex, null, .95, 170);                       /* gutter+shoulder — line sits here */
-ribbon(-ROAD_OFF-3.45, -ROAD_OFF-4.4, .002, gravelTex, null, .95, 170);              /* far shoulder */
-
-/* ================= streetlights (baked pools + emissive heads) ================= */
-{
-  const N=11, poleG=[], headG=[];
-  const poleGeo=new THREE.CylinderGeometry(.06,.09,7.6,12);
-  const armGeo=new THREE.CylinderGeometry(.04,.04,2.1,10);
-  const headGeo=new THREE.BoxGeometry(.62,.16,.26);
-  const poleMat=new THREE.MeshStandardMaterial({map:galvTex, color:0x9aa1a8, roughness:.5, metalness:.7});
-  const headMat=new THREE.MeshStandardMaterial({color:0x0e1012, roughness:.4, metalness:.5, emissive:0xe9eff5, emissiveIntensity:2.2});
-  const pool=new THREE.PlaneGeometry(7,7);
-  const poolMat=new THREE.MeshBasicMaterial({map:poolTex, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, opacity:.8});
-  for(let i=0;i<N;i++){
-    const z=-40-i*48, t=tForZ(z), p=rp(t), s=sideOf(t);
-    const g=new THREE.Group();
-    const base=p.clone().addScaledVector(s,1.3);
-    g.position.set(base.x,0,base.z);
-    g.lookAt(base.x-s.x,0,base.z-s.z);
-    const pm=new THREE.Mesh(poleGeo,poleMat); pm.position.y=3.8; pm.castShadow=false; g.add(pm);
-    const am=new THREE.Mesh(armGeo,poleMat); am.rotation.x=Math.PI/2; am.position.set(0,7.35,-1.55); g.add(am);
-    const hm=new THREE.Mesh(headGeo,headMat); hm.position.set(0,7.32,-2.85); g.add(hm);
-    const pl=new THREE.Mesh(pool,poolMat); pl.scale.setScalar(1.5); pl.rotation.x=-Math.PI/2; pl.position.set(0,.035,-2.85); g.add(pl);
-    scene.add(g);
-  }
-}
-
-/* ================= joint-use pole line (instanced, merged) ================= */
-const POLE_H=8.6, XARM_Y=8.1, NEUT_Y=7.2;
-const COMM_Y=[5.9,5.55,5.2];
-const MATP={
-  wood:new THREE.MeshStandardMaterial({map:poleWoodTex, color:0xb9a58e, roughness:.86, metalness:.04}),
-  steel:new THREE.MeshStandardMaterial({map:galvTex, color:0xb9c0c7, roughness:.42, metalness:.8}),
-  ceramic:new THREE.MeshStandardMaterial({color:0x7a8a96, roughness:.22, metalness:.1}),
-  dark:new THREE.MeshStandardMaterial({color:0x2e343b, roughness:.5, metalness:.6}),
-};
-function poleSpec(){
-  const s=[];
-  s.push({b:'wood', g:new THREE.CylinderGeometry(.11,.17,POLE_H,20,1), p:[0,POLE_H/2,0]});
-  s.push({b:'wood', g:new THREE.CylinderGeometry(.12,.12,.06,20), p:[0,POLE_H+.02,0]});
-  s.push({b:'wood', g:new THREE.BoxGeometry(2.5,.12,.14), p:[0,XARM_Y,0]});
-  s.push({b:'steel',g:new THREE.BoxGeometry(.05,.8,.05), p:[-.56,XARM_Y-.38,0], r:[0,0,.62]});
-  s.push({b:'steel',g:new THREE.BoxGeometry(.05,.8,.05), p:[ .56,XARM_Y-.38,0], r:[0,0,-.62]});
-  for(const px of [-1.05,0,1.05]){
-    s.push({b:'ceramic', g:new THREE.CylinderGeometry(.05,.068,.12,12), p:[px,XARM_Y+.12,0]});
-    s.push({b:'ceramic', g:new THREE.SphereGeometry(.06,12,10), p:[px,XARM_Y+.2,0]});
-  }
-  s.push({b:'steel', g:new THREE.BoxGeometry(.07,.2,.07), p:[.2,NEUT_Y,0]});
-  for(const y of COMM_Y){
-    s.push({b:'dark',  g:new THREE.BoxGeometry(.24,.09,.1), p:[0,y,0]});
-    s.push({b:'steel', g:new THREE.CylinderGeometry(.018,.018,.34,8), p:[0,y,0], r:[0,0,Math.PI/2]});
-  }
-  return s;
-}
-const poleData=[];
-{
-  const buckets={wood:[],steel:[],ceramic:[],dark:[]};
-  const m4=new THREE.Matrix4(), q=new THREE.Quaternion(), e=new THREE.Euler();
-  for(const it of poleSpec()){
-    const g2=it.g.clone(); e.set(...(it.r||[0,0,0])); q.setFromEuler(e);
-    m4.compose(new THREE.Vector3(...it.p),q,new THREE.Vector3(1,1,1));
-    g2.applyMatrix4(m4); buckets[it.b].push(g2);
-  }
-  const POLES=15;
-  const inst={};
-  for(const k in buckets){ inst[k]=new THREE.InstancedMesh(BGU.mergeGeometries(buckets[k]),MATP[k],POLES);
-    inst[k].castShadow=!isMobile; inst[k].frustumCulled=false; scene.add(inst[k]); }
-  const d=new THREE.Object3D();
-  for(let i=0;i<POLES;i++){
-    const z=-14-i*38, t=tForZ(z), p=rp(t), s=sideOf(t);
-    d.position.set(p.x+s.x*2.2,0,p.z+s.z*2.2);
-    d.rotation.set(0,Math.atan2(rt(t).x,rt(t).z)+Math.PI/2,0);
-    d.updateMatrix();
-    for(const k in inst) inst[k].setMatrixAt(i,d.matrix);
-    poleData.push({pos:d.position.clone()});
-  }
-  for(const k in inst) inst[k].instanceMatrix.needsUpdate=true;
-}
-/* conductor spans (lines) + one lashed comm cable (tube) */
-{
-  const segs=[], SA=9;
-  const span=(A,B,sag)=>{ let prev=null;
-    for(let k=0;k<=SA;k++){ const u=k/SA;
-      const x=A.x+(B.x-A.x)*u, z=A.z+(B.z-A.z)*u, y=A.y+(B.y-A.y)*u-sag*4*u*(1-u);
-      if(prev) segs.push(prev[0],prev[1],prev[2],x,y,z); prev=[x,y,z]; } };
-  for(let i=0;i<poleData.length-1;i++){
-    const a=poleData[i].pos, b=poleData[i+1].pos;
-    for(const off of [-1.05,0,1.05]){
-      const A=a.clone(); A.y=XARM_Y+.24; const B=b.clone(); B.y=XARM_Y+.24;
-      span(A,B,.75);
-    }
-    const A=a.clone(); A.y=NEUT_Y; const B=b.clone(); B.y=NEUT_Y; span(A,B,.65);
-  }
-  const g=new THREE.BufferGeometry();
-  g.setAttribute('position',new THREE.Float32BufferAttribute(segs,3));
-  scene.add(new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0x3c4148,transparent:true,opacity:.5})));
-  const pts=[];
-  for(let i=0;i<poleData.length;i++){
-    const P=poleData[i].pos.clone(); P.y=COMM_Y[1]; pts.push(P);
-    if(i<poleData.length-1){ const Q=poleData[i+1].pos.clone(); Q.y=COMM_Y[1];
-      const mid=P.clone().add(Q).multiplyScalar(.5); mid.y-=.5; pts.push(mid); }
-  }
-  const c=new THREE.CatmullRomCurve3(pts,false,'catmullrom',.6);
-  const tube=new THREE.Mesh(new THREE.TubeGeometry(c,700,.022,6,false),
-    new THREE.MeshStandardMaterial({color:0x191d22, roughness:.5, metalness:.4}));
-  scene.add(tube);
-}
-
-/* ================= trees + tufts (instanced billboards) ================= */
-{
-  const treeMat=new THREE.MeshBasicMaterial({map:treeTex, transparent:true, alphaTest:.18, side:THREE.DoubleSide,
-    color:0x565d66, fog:true, depthWrite:false});
-  const NT=56;
-  const g1=new THREE.InstancedMesh(new THREE.PlaneGeometry(9,11),treeMat,NT);
-  const g2=new THREE.InstancedMesh(new THREE.PlaneGeometry(9,11),treeMat,NT);
-  const d=new THREE.Object3D();
-  for(let i=0;i<NT;i++){
-    const z=-Math.random()*560, t=tForZ(z), p=rp(t), s=sideOf(t);
-    const side=Math.random()<.5?1:-1;
-    const dist=(side>0? 16+Math.random()*46 : 18+Math.random()*52);
-    const sc=.8+Math.random()*1.2;
-    d.position.set(p.x+s.x*dist*side - (side>0?0:ROAD_OFF*1.4), 5.4*sc, p.z+s.z*dist*side);
-    d.rotation.set(0,Math.random()*Math.PI,0); d.scale.setScalar(sc); d.updateMatrix();
-    g1.setMatrixAt(i,d.matrix);
-    d.rotation.y+=Math.PI/2; d.updateMatrix(); g2.setMatrixAt(i,d.matrix);
-  }
-  g1.instanceMatrix.needsUpdate=g2.instanceMatrix.needsUpdate=true;
-  scene.add(g1,g2);
-  const tuftMat=new THREE.MeshBasicMaterial({map:tuftTex,transparent:true,alphaTest:.3,side:THREE.DoubleSide,color:0x767d70,fog:true});
-  const NG=420;
-  const t1=new THREE.InstancedMesh(new THREE.PlaneGeometry(.55,.4),tuftMat,NG);
-  for(let i=0;i<NG;i++){
-    const z=-4-Math.random()*548, t=tForZ(z), p=rp(t), s=sideOf(t);
-    const off=.6+Math.random()*2.6;
-    d.position.set(p.x+s.x*off,.17,p.z+s.z*off);
-    d.rotation.set(0,Math.random()*Math.PI,0); d.scale.setScalar(.7+Math.random()*.9); d.updateMatrix();
-    t1.setMatrixAt(i,d.matrix);
-  }
-  t1.instanceMatrix.needsUpdate=true; scene.add(t1);
-}
-
-/* distant warm lights */
-{
-  const N=90, arr=new Float32Array(N*3), col=new Float32Array(N*3);
-  for(let i=0;i<N;i++){
-    const z=-Math.random()*620, x=(Math.random()<.5?-1:1)*(60+Math.random()*240);
-    arr[i*3]=x; arr[i*3+1]=.6+Math.random()*3; arr[i*3+2]=z;
-    const warm=Math.random()<.85;
-    col[i*3]=warm?1:.7; col[i*3+1]=warm?.72:.85; col[i*3+2]=warm?.4:1;
-  }
-  const g=new THREE.BufferGeometry();
-  g.setAttribute('position',new THREE.BufferAttribute(arr,3));
-  g.setAttribute('color',new THREE.BufferAttribute(col,3));
-  scene.add(new THREE.Points(g,new THREE.PointsMaterial({size:.9,vertexColors:true,transparent:true,opacity:.85,depthWrite:false})));
-}
-
-/* ================= practicals budget ================= */
-const practicals=[];
-function addPractical(light){ practicals.push(light); return light; }
-
-/* ================= SCENES ================= */
-const SCENES={};           /* key → {group, camPos, lookAt, update} */
-const sceneUpdaters=[];
-
-/* ---------- STOP 0 · DESK OPENER (hand-built fidelity reference) ---------- */
-{
-  const g=new THREE.Group();
-  g.position.copy(DESK); g.rotation.y=deskYaw;
-  scene.add(g);
-
-  const deskMat=new THREE.MeshStandardMaterial({map:deskWoodTex, roughness:.52, metalness:.05});
-  const steelDark=new THREE.MeshStandardMaterial({color:0x23262b, roughness:.4, metalness:.75});
-
-  /* desk top with edge bevel (extruded rounded rect) */
-  {
-    const w=1.9, dpt=1.15, r=.045;
-    const sh=new THREE.Shape();
-    sh.moveTo(-w/2+r,-dpt/2); sh.lineTo(w/2-r,-dpt/2); sh.quadraticCurveTo(w/2,-dpt/2,w/2,-dpt/2+r);
-    sh.lineTo(w/2,dpt/2-r); sh.quadraticCurveTo(w/2,dpt/2,w/2-r,dpt/2);
-    sh.lineTo(-w/2+r,dpt/2); sh.quadraticCurveTo(-w/2,dpt/2,-w/2,dpt/2-r);
-    sh.lineTo(-w/2,-dpt/2+r); sh.quadraticCurveTo(-w/2,-dpt/2,-w/2+r,-dpt/2);
-    const geo=new THREE.ExtrudeGeometry(sh,{depth:.05,bevelEnabled:true,bevelThickness:.012,bevelSize:.012,bevelSegments:3});
-    geo.rotateX(-Math.PI/2);
-    const top=new THREE.Mesh(geo,deskMat);
-    top.position.y=DESK_H-.05; top.castShadow=top.receiveShadow=true; g.add(top);
-  }
-  /* legs + stretcher */
-  for(const [lx,lz] of [[-.85,-.47],[.85,-.47],[-.85,.47],[.85,.47]]){
-    const leg=new THREE.Mesh(new THREE.CylinderGeometry(.035,.042,DESK_H-.05,14),steelDark);
-    leg.position.set(lx,(DESK_H-.05)/2,lz); leg.castShadow=true; g.add(leg);
-  }
-  const str=new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,1.62,10),steelDark);
-  str.rotation.z=Math.PI/2; str.position.set(0,.24,-.47); g.add(str);
-
-  /* backdrop panel (sells night interior) */
-  {
-    const bp=new THREE.Mesh(new THREE.PlaneGeometry(13,7),
-      new THREE.MeshStandardMaterial({color:0x0b0c11, roughness:.96, metalness:0}));
-    bp.position.set(-.4,3.4,2.3); bp.rotation.y=Math.PI; g.add(bp);
-  }
-
-  /* plan sheet — 32×24 segment plane with baked curl */
-  {
-    const geo=new THREE.PlaneGeometry(SHEET_W,SHEET_D,48,32);
-    const pos=geo.attributes.position;
-    for(let i=0;i<pos.count;i++){
-      const px=pos.getX(i), py=pos.getY(i);
-      const edge=Math.max(Math.abs(px)/(SHEET_W/2),Math.abs(py)/(SHEET_D/2));
-      const lift=Math.pow(Math.max(0,edge-.82)/.18,2)*.018;
-      const ripple=Math.sin(px*9.5)*Math.cos(py*7.2)*.0022;
-      pos.setZ(i,lift+ripple);
-    }
-    geo.computeVertexNormals();
-    const sheet=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({map:planTex,roughness:.68,metalness:0}));
-    sheet.rotation.x=-Math.PI/2; sheet.position.y=DESK_H+.0175;
-    sheet.receiveShadow=true; g.add(sheet);
-  }
-
-  /* articulated lamp — warm practical (desk-local, anchored) */
-  const lampGrp=new THREE.Group(); lampGrp.position.set(-.72,DESK_H-.002,-.36); g.add(lampGrp);
-  let lampLight;
-  {
-    const lm=new THREE.MeshStandardMaterial({color:0x191b1f, roughness:.36, metalness:.8});
-    const base=new THREE.Mesh(new THREE.CylinderGeometry(.085,.1,.03,24),lm); base.position.y=.015; base.castShadow=true; lampGrp.add(base);
-    const knuckle=new THREE.Mesh(new THREE.SphereGeometry(.024,12,10),lm); knuckle.position.y=.035; lampGrp.add(knuckle);
-    /* lower arm: from base up and toward sheet */
-    const a1=new THREE.Mesh(new THREE.CylinderGeometry(.014,.016,.5,10),lm);
-    a1.position.set(.1,.26,.05); a1.rotation.z=-.42; a1.rotation.x=.12; a1.castShadow=true; lampGrp.add(a1);
-    const elbow=new THREE.Mesh(new THREE.SphereGeometry(.02,12,10),lm); elbow.position.set(.2,.48,.1); lampGrp.add(elbow);
-    /* upper arm: forward over the sheet */
-    const a2=new THREE.Mesh(new THREE.CylinderGeometry(.012,.014,.46,10),lm);
-    a2.position.set(.38,.55,.16); a2.rotation.z=-1.28; a2.rotation.x=.08; a2.castShadow=true; lampGrp.add(a2);
-    /* head above the sheet, aimed down-right onto the paper */
-    const headGrp=new THREE.Group(); headGrp.position.set(.58,.58,.2); headGrp.rotation.set(.5,0,2.6); lampGrp.add(headGrp);
-    const shade=new THREE.Mesh(new THREE.ConeGeometry(.09,.17,24,1,true),
-      new THREE.MeshStandardMaterial({color:0x15171b, roughness:.4, metalness:.7, side:THREE.DoubleSide}));
-    shade.castShadow=true; headGrp.add(shade);
-    const bulb=new THREE.Mesh(new THREE.SphereGeometry(.028,12,10),
-      new THREE.MeshStandardMaterial({color:0x120a02, emissive:0xffc27d, emissiveIntensity:1.7}));
-    bulb.position.y=-.055; headGrp.add(bulb);
-    /* the actual light, parented into the head so it stays with geometry */
-    lampLight=addPractical(new THREE.SpotLight(0xffbe78, 4.2, 4.5, .74, .7, 1.7));
-    lampLight.position.set(0,-.06,0);
-    headGrp.add(lampLight);
-    const lampTarget=new THREE.Object3D(); lampTarget.position.set(1.15,-.62,.15); lampGrp.add(lampTarget);
-    lampLight.target=lampTarget;
-    lampLight.castShadow=!isMobile; lampLight.shadow.mapSize.set(1024,1024); lampLight.shadow.bias=-.002;
-  }
-
-  /* props: engineer scale, pencils, mug, rolls, DRAFTECH case */
-  {
-    const alu=new THREE.MeshStandardMaterial({map:galvTex, color:0xeef2f5, roughness:.26, metalness:.9});
-    const tri=new THREE.Mesh(new THREE.CylinderGeometry(.018,.018,.3,3),alu);
-    tri.rotation.set(Math.PI/2,0,1.25); tri.position.set(.52,DESK_H+.013,.18); tri.castShadow=true; g.add(tri);
-    for(const [px,pz,ry,col] of [[.48,.42,.5,0xc8a03a],[.55,.39,1.0,0xb44a3a]]){
-      const pen=new THREE.Mesh(new THREE.CylinderGeometry(.006,.006,.17,10),
-        new THREE.MeshStandardMaterial({color:col,roughness:.45}));
-      pen.rotation.set(Math.PI/2,0,ry); pen.position.set(px,DESK_H+.009,pz); pen.castShadow=true; g.add(pen);
-    }
-    const mug=new THREE.Group(); mug.position.set(-.62,DESK_H,.31); g.add(mug);
-    const mugMat=new THREE.MeshStandardMaterial({color:0x9d3324, roughness:.35});
-    const cup=new THREE.Mesh(new THREE.CylinderGeometry(.045,.04,.1,24,1,true),mugMat); cup.position.y=.05; cup.castShadow=true; mug.add(cup);
-    const btm=new THREE.Mesh(new THREE.CircleGeometry(.04,24),mugMat); btm.rotation.x=-Math.PI/2; btm.position.y=.001; mug.add(btm);
-    const cof=new THREE.Mesh(new THREE.CircleGeometry(.041,24),
-      new THREE.MeshStandardMaterial({color:0x1d1108,roughness:.15})); cof.rotation.x=-Math.PI/2; cof.position.y=.085; mug.add(cof);
-    const hdl=new THREE.Mesh(new THREE.TorusGeometry(.028,.008,10,22,Math.PI*1.2),mugMat);
-    hdl.position.set(.048,.05,0); hdl.rotation.z=-.6; mug.add(hdl);
-    for(let i=0;i<2;i++){
-      const rollGrp=new THREE.Group();
-      rollGrp.position.set(-.42+i*.07,DESK_H+.034+i*.011,.44);
-      rollGrp.rotation.set(0,.22+i*.1,0);
-      g.add(rollGrp);
-      const roll=new THREE.Mesh(new THREE.CylinderGeometry(.032,.032,.72,18),
-        new THREE.MeshStandardMaterial({color:0xcfc7b4, roughness:.75}));
-      roll.rotation.z=Math.PI/2; roll.castShadow=true; rollGrp.add(roll);
-      for(const bx of [-.24,.22]){
-        const band=new THREE.Mesh(new THREE.TorusGeometry(.034,.0038,8,20),
-          new THREE.MeshStandardMaterial({color:0x8a4a3a,roughness:.6}));
-        band.rotation.y=Math.PI/2; band.position.x=bx; rollGrp.add(band);
-      }
-    }
-    /* DRAFTECH case on the floor */
-    const caseTex=ctex(512,256,(x,w,h)=>{
-      x.fillStyle='#181b20'; x.fillRect(0,0,w,h);
-      grain(x,w,h,2600,.03,.1,.5);
-      for(let gy=0;gy<h;gy+=26){ x.fillStyle='rgba(0,0,0,.28)'; x.fillRect(0,gy,w,3); }
-      x.font='800 44px Montserrat, Arial'; x.textAlign='center';
-      x.fillStyle='#cfd6dd'; x.fillText('DRAF',w/2-46,h/2+16);
-      x.fillStyle='#19c8de'; x.fillText('TECH',w/2+52,h/2+16);
-    },{clamp:true});
-    const cs=new THREE.Mesh(new THREE.BoxGeometry(.62,.4,.22),
-      new THREE.MeshStandardMaterial({map:caseTex, roughness:.6, metalness:.2}));
-    cs.position.set(-1.12,.2,.28); cs.rotation.y=.5; cs.castShadow=true; g.add(cs);
-  }
-
-  /* dust motes in lamp cone */
-  const motes=(()=> {
-    const N=42, a=new Float32Array(N*3), meta=[];
-    for(let i=0;i<N;i++){ meta.push({r:.06+Math.random()*.3, th:Math.random()*Math.PI*2, sp:.1+Math.random()*.25, y:Math.random()});
-      a[i*3+1]=DESK_H+Math.random()*.5; }
-    const gg=new THREE.BufferGeometry(); gg.setAttribute('position',new THREE.BufferAttribute(a,3));
-    const pts=new THREE.Points(gg,new THREE.PointsMaterial({color:0xffd9a8,size:.008,transparent:true,opacity:.6,
-      blending:THREE.AdditiveBlending,depthWrite:false}));
-    pts.position.set(DESK.x-.1,0,DESK.z-.1);
-    scene.add(pts);
-    return {pts,gg,a,meta,N};
-  })();
-
-  SCENES.open={
-    group:g,
-    camPos:new THREE.Vector3(DESK.x+.7,DESK_H+1.28,DESK.z+1.85),
-    lookAt:new THREE.Vector3(DESK.x+.08,DESK_H-.1,DESK.z-.3),
-    update:(time)=>{
-      const breathe=.9+.1*Math.sin(time*1.15);
-      lampLight.intensity=4.2*breathe;
-      for(let i=0;i<motes.N;i++){
-        const m=motes.meta[i];
-        m.y=(m.y+.0007+m.sp*.0005)%1;
-        const r=m.r*(1+m.y*.8);
-        motes.a[i*3]= -.15+Math.cos(m.th+time*m.sp)*r;
-        motes.a[i*3+1]=DESK_H+.62-m.y*.55;
-        motes.a[i*3+2]= -.12+Math.sin(m.th+time*m.sp)*r;
-      }
-      motes.gg.attributes.position.needsUpdate=true;
-    }
-  };
-}
-
-/* ---------- SCENE MODULES (generated + integrated) ---------- */
-{ /* ---- SCENE: survey ---- */
-const S=STOPS.find(s=>s.key==='survey'); const t=S.t, P=rp(t), SD=sideOf(t), TN=rt(t);
-const g=new THREE.Group(); g.position.set(P.x+SD.x*2.6, 0, P.z+SD.z*2.6); g.lookAt(P.x,0,P.z); scene.add(g);
-
-// ---------- TEXTURES (4 new ctex) ----------
-const metalYellowTex = ctex(1024,1024,(ctx,w,h)=>{
-  ctx.fillStyle='#e8b400'; ctx.fillRect(0,0,w,h);
-  const grd=ctx.createLinearGradient(0,0,w,0);
-  grd.addColorStop(0,'rgba(255,255,255,0.10)'); grd.addColorStop(0.5,'rgba(0,0,0,0.05)'); grd.addColorStop(1,'rgba(255,255,255,0.08)');
-  ctx.fillStyle=grd; ctx.fillRect(0,0,w,h);
-  ctx.strokeStyle='rgba(0,0,0,0.06)'; ctx.lineWidth=1;
-  for(let i=0;i<220;i++){ const x=Math.random()*w; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+(Math.random()*4-2),h); ctx.stroke(); }
-  ctx.strokeStyle='rgba(30,20,0,0.35)'; ctx.lineWidth=3;
-  ctx.strokeRect(w*0.06,h*0.06,w*0.88,h*0.88);
-  blotch(ctx,w,h,10,'rgba(40,30,0,$)',0.05,0.18,20,70);
-  blotch(ctx,w,h,6,'rgba(0,0,0,$)',0.08,0.22,10,40);
-  grain(ctx,w,h,7000,0.02,0.09,0.55);
-},{});
-const stationPanelTex = ctex(768,1024,(ctx,w,h)=>{
-  ctx.fillStyle='#232326'; ctx.fillRect(0,0,w,h);
-  grain(ctx,w,h,4000,0.02,0.08,0.6);
-  ctx.fillStyle='#141416'; ctx.fillRect(w*0.08,h*0.06,w*0.84,h*0.30);
-  const gg=ctx.createRadialGradient(w*0.5,h*0.21,4,w*0.5,h*0.21,w*0.42);
-  gg.addColorStop(0,'rgba(207,232,242,0.55)'); gg.addColorStop(1,'rgba(207,232,242,0)');
-  ctx.fillStyle=gg; ctx.fillRect(w*0.08,h*0.06,w*0.84,h*0.30);
-  for(let row=0;row<5;row++){ for(let col=0;col<4;col++){
-    const kx=w*0.12+col*(w*0.19), ky=h*0.42+row*(h*0.105), kw=w*0.15, kh=h*0.075;
-    ctx.fillStyle='#3a3a3e'; ctx.fillRect(kx,ky,kw,kh);
-    ctx.fillStyle='rgba(255,255,255,0.08)'; ctx.fillRect(kx,ky,kw,kh*0.3);
-    ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=2; ctx.strokeRect(kx,ky,kw,kh);
-  }}
-  blotch(ctx,w,h,5,'rgba(0,0,0,$)',0.1,0.25,30,80);
-},{});
-const carbonPoleTex = ctex(256,1024,(ctx,w,h)=>{
-  ctx.fillStyle='#16181a'; ctx.fillRect(0,0,w,h);
-  for(let y=0;y<h;y+=4){ for(let x=0;x<w;x+=4){ ctx.fillStyle=((x+y)/4)%2===0?'rgba(255,255,255,0.035)':'rgba(0,0,0,0.05)'; ctx.fillRect(x,y,4,4); } }
-  ctx.fillStyle='#e5e5e5'; ctx.fillRect(0,h*0.0,w,h*0.42);
-  ctx.fillStyle='#c81e2c'; ctx.fillRect(0,h*0.42,w,h*0.16);
-  ctx.fillStyle='#16181a'; ctx.fillRect(0,h*0.58,w,h*0.42);
-  ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=6;
-  ctx.strokeRect(0,h*0.0,w,h*0.42); ctx.strokeRect(0,h*0.42,w,h*0.16);
-  grain(ctx,w,h,2500,0.03,0.1,0.5);
-},{});
-carbonPoleTex.wrapS=THREE.RepeatWrapping; carbonPoleTex.wrapT=THREE.RepeatWrapping; carbonPoleTex.repeat.set(1,9); carbonPoleTex.needsUpdate=true;
-
-const caseRibTex = ctex(1024,1024,(ctx,w,h)=>{
-  ctx.fillStyle='#141416'; ctx.fillRect(0,0,w,h);
-  for(let x=0;x<w;x+=26){
-    ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fillRect(x,0,4,h);
-    ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(x+4,0,10,h);
-  }
-  grain(ctx,w,h,6000,0.02,0.1,0.6);
-  blotch(ctx,w,h,10,'rgba(0,0,0,$)',0.12,0.28,30,90);
-  blotch(ctx,w,h,4,'rgba(255,255,255,$)',0.03,0.07,10,30);
-  // logo plate, kept small & centered so corner crops (side faces) stay logo-free
-  const px=w*0.32, py=h*0.44, pw=w*0.36, ph=h*0.12;
-  ctx.fillStyle='rgba(10,10,11,0.85)'; ctx.fillRect(px,py,pw,ph);
-  ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=2; ctx.strokeRect(px,py,pw,ph);
-  ctx.font='800 '+Math.floor(ph*0.62)+'px Montserrat, Arial';
-  ctx.textBaseline='middle'; ctx.textAlign='left';
-  const ty=py+ph*0.54;
-  ctx.fillStyle='#ffffff'; ctx.fillText('DRAF',px+pw*0.08,ty);
-  const drafW=ctx.measureText('DRAF').width;
-  ctx.fillStyle='#19c8de'; ctx.fillText('TECH',px+pw*0.08+drafW,ty);
-},{});
-const caseSideTex = caseRibTex.clone(); caseSideTex.wrapS=THREE.RepeatWrapping; caseSideTex.wrapT=THREE.RepeatWrapping;
-caseSideTex.repeat.set(0.22,0.22); caseSideTex.offset.set(0.03,0.03); caseSideTex.needsUpdate=true;
-
-// ---------- MATERIALS ----------
-const yellowMat = new THREE.MeshStandardMaterial({map:metalYellowTex, roughness:0.48, metalness:0.55});
-const panelMat  = new THREE.MeshStandardMaterial({map:stationPanelTex, roughness:0.6, metalness:0.15});
-const poleMat   = new THREE.MeshStandardMaterial({map:carbonPoleTex, roughness:0.55, metalness:0.1});
-const caseFrontMat = new THREE.MeshStandardMaterial({map:caseRibTex, roughness:0.62, metalness:0.12});
-const caseSideMat  = new THREE.MeshStandardMaterial({map:caseSideTex, roughness:0.65, metalness:0.1});
-const rubberMat = new THREE.MeshStandardMaterial({color:0x1b1b1d, roughness:0.85, metalness:0.05});
-const brassMat  = new THREE.MeshStandardMaterial({color:0xc9a227, roughness:0.32, metalness:0.85});
-const lensGlassMat = new THREE.MeshStandardMaterial({color:0x050505, roughness:0.12, metalness:0.6});
-const paperMat = new THREE.MeshStandardMaterial({map:planTex, roughness:0.9, metalness:0.0});
-const paperBackMat = new THREE.MeshStandardMaterial({color:0xece6d8, roughness:0.95, metalness:0.0});
-const woodMat = new THREE.MeshStandardMaterial({map:poleWoodTex, roughness:0.88, metalness:0.02});
-const flagMat = new THREE.MeshStandardMaterial({color:0xff2f7d, roughness:0.6, metalness:0.0, side:THREE.DoubleSide, emissive:0x330012, emissiveIntensity:0.4});
-
-// ---------- helper: rounded-rect extrude ----------
-function roundedRect(w,h,r){
-  const sh=new THREE.Shape(); const x=-w/2,y=-h/2;
-  sh.moveTo(x+r,y); sh.lineTo(x+w-r,y); sh.quadraticCurveTo(x+w,y,x+w,y+r);
-  sh.lineTo(x+w,y+h-r); sh.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
-  sh.lineTo(x+r,y+h); sh.quadraticCurveTo(x,y+h,x,y+h-r);
-  sh.lineTo(x,y+r); sh.quadraticCurveTo(x,y,x+r,y);
-  return sh;
-}
-
-// ================= TOTAL STATION + TRIPOD =================
-const tsGrp=new THREE.Group(); tsGrp.position.set(0.15,0,-0.25);
-
-// tripod legs -- feet solved analytically so they land exactly on y=0:
-// rotation.set(PHI,ang,0) applies tilt(X) first then azimuth(Y), which correctly
-// spins the tilted leg direction around the vertical axis per-leg.
-const legTex=metalYellowTex.clone(); legTex.wrapS=THREE.RepeatWrapping; legTex.wrapT=THREE.RepeatWrapping; legTex.repeat.set(1,3); legTex.needsUpdate=true;
-const legMat=new THREE.MeshStandardMaterial({map:legTex, roughness:0.5, metalness:0.5});
-const HEAD_Y=1.25;
-const PHI=0.45; // leg tilt from vertical (rad)
-const LEG_L=HEAD_Y/Math.cos(PHI); // total leg run so the foot tip reaches y=0
-const upperLen=LEG_L*0.52, collarLen=LEG_L*0.04, lowerLen=LEG_L*0.38, footLen=LEG_L*0.06;
-for(let i=0;i<3;i++){
-  const ang=i*(Math.PI*2/3)+0.3;
-  const legGrp=new THREE.Group();
-  legGrp.position.set(0,HEAD_Y,0);
-  legGrp.rotation.set(PHI,ang,0);
-  const upper=new THREE.Mesh(new THREE.CylinderGeometry(0.024,0.02,upperLen,20), legMat);
-  upper.position.y=-upperLen/2; upper.castShadow=true; legGrp.add(upper);
-  const collar=new THREE.Mesh(new THREE.CylinderGeometry(0.028,0.028,collarLen,16), rubberMat);
-  collar.position.y=-upperLen-collarLen/2; collar.castShadow=true; legGrp.add(collar);
-  const lower=new THREE.Mesh(new THREE.CylinderGeometry(0.017,0.014,lowerLen,20), legMat);
-  lower.position.y=-upperLen-collarLen-lowerLen/2; lower.castShadow=true; legGrp.add(lower);
-  const foot=new THREE.Mesh(new THREE.ConeGeometry(0.02,footLen,16), MATP.steel);
-  foot.position.y=-upperLen-collarLen-lowerLen-footLen/2; foot.castShadow=true; legGrp.add(foot);
-  tsGrp.add(legGrp);
-}
-// tripod head plate
-const headPlate=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.13,0.035,20), legMat);
-headPlate.position.y=HEAD_Y; headPlate.castShadow=true; tsGrp.add(headPlate);
-// tribrach base
-const tribrach=new THREE.Mesh(new THREE.CylinderGeometry(0.075,0.09,0.05,20), MATP.steel);
-tribrach.position.y=HEAD_Y+0.05; tribrach.castShadow=true; tsGrp.add(tribrach);
-for(let i=0;i<3;i++){
-  const ang=i*(Math.PI*2/3);
-  const knob=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.03,16), brassMat);
-  knob.position.set(Math.cos(ang)*0.09,HEAD_Y+0.06,Math.sin(ang)*0.09);
-  knob.rotation.x=Math.PI/2; knob.castShadow=true; tsGrp.add(knob);
-}
-// instrument lower chassis (safety yellow)
-const chassisGeo=new THREE.ExtrudeGeometry(roundedRect(0.22,0.15,0.02),{depth:0.2,bevelEnabled:true,bevelThickness:0.006,bevelSize:0.006,bevelSegments:2,curveSegments:8});
-chassisGeo.translate(0,0,-0.1);
-chassisGeo.rotateX(Math.PI/2);
-const chassis=new THREE.Mesh(chassisGeo, yellowMat);
-chassis.position.y=HEAD_Y+0.09+0.075; chassis.castShadow=true; tsGrp.add(chassis);
-// alidade block (charcoal) on top of chassis
-const alidadeGeo=new THREE.ExtrudeGeometry(roundedRect(0.17,0.11,0.015),{depth:0.17,bevelEnabled:true,bevelThickness:0.005,bevelSize:0.005,bevelSegments:2,curveSegments:8});
-alidadeGeo.translate(0,0,-0.085);
-alidadeGeo.rotateX(Math.PI/2);
-const alidade=new THREE.Mesh(alidadeGeo, MATP.dark);
-alidade.position.y=HEAD_Y+0.09+0.15+0.055; alidade.castShadow=true; tsGrp.add(alidade);
-const ALI_Y=alidade.position.y;
-// keypad panel on rear face of alidade
-const keypad=new THREE.Mesh(new THREE.PlaneGeometry(0.12,0.16), panelMat);
-keypad.position.set(0, ALI_Y-0.005, 0.086); keypad.rotation.x=-0.08; keypad.castShadow=false; tsGrp.add(keypad);
-// telescope barrel (forward, over -z toward the road/line)
-const teleGrp=new THREE.Group(); teleGrp.position.set(0,ALI_Y+0.01,-0.02); tsGrp.add(teleGrp);
-const barrel=new THREE.Mesh(new THREE.CylinderGeometry(0.042,0.045,0.24,20), MATP.dark);
-barrel.rotation.x=Math.PI/2; barrel.position.z=-0.12; barrel.castShadow=true; teleGrp.add(barrel);
-// trunnion side knobs
-for(const sx of [-1,1]){
-  const trun=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.05,16), MATP.steel);
-  trun.rotation.z=Math.PI/2; trun.position.set(sx*0.06,0,-0.03); trun.castShadow=true; teleGrp.add(trun);
-  const focusKnob=new THREE.Mesh(new THREE.CylinderGeometry(0.017,0.017,0.022,16), rubberMat);
-  focusKnob.rotation.z=Math.PI/2; focusKnob.position.set(sx*0.083,0,-0.03); focusKnob.castShadow=true; teleGrp.add(focusKnob);
-}
-// recessed lens + glint
-const lensRing=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.012,20), MATP.steel);
-lensRing.rotation.x=Math.PI/2; lensRing.position.z=-0.238; lensRing.castShadow=true; teleGrp.add(lensRing);
-const lensGlass=new THREE.Mesh(new THREE.CircleGeometry(0.026,20), lensGlassMat);
-lensGlass.position.z=-0.245; lensGlass.rotation.y=Math.PI; teleGrp.add(lensGlass);
-const glintMat=new THREE.MeshStandardMaterial({color:0x19c8de, emissive:0x19c8de, emissiveIntensity:0.6, roughness:0.3, metalness:0.2});
-const glint=new THREE.Mesh(new THREE.SphereGeometry(0.005,10,10), glintMat);
-glint.position.z=-0.247; teleGrp.add(glint);
-
-g.add(tsGrp);
-
-// ================= FIELD CASE =================
-const caseGrp=new THREE.Group(); caseGrp.position.set(0.85,0,-0.15);
-const CASE_W=0.45, CASE_H=0.6, CASE_D=0.25;
-const caseBox=new THREE.Mesh(new THREE.BoxGeometry(CASE_W,CASE_H,CASE_D),[caseSideMat,caseSideMat,caseSideMat,caseSideMat,caseFrontMat,caseSideMat]);
-caseBox.rotation.y=Math.PI; // logo (+z) faces toward -z (outward/road side)
-caseBox.position.y=CASE_H/2; caseBox.castShadow=true; caseBox.receiveShadow=true; caseGrp.add(caseBox);
-const edgeOffsets=[[1,1],[1,-1],[-1,1],[-1,-1]];
-for(const [ex,ez] of edgeOffsets){
-  const edge=new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.016,CASE_H,16), rubberMat);
-  edge.position.set(ex*(CASE_W/2-0.02),CASE_H/2,ez*(CASE_D/2-0.02)); edge.castShadow=true; caseGrp.add(edge);
-}
-g.add(caseGrp);
-
-// ---- open field book on case top ----
-const bookGrp=new THREE.Group(); bookGrp.position.set(0.85,CASE_H+0.01,-0.15); g.add(bookGrp);
-const pageGeo=new THREE.BoxGeometry(0.26,0.004,0.19);
-const pageL=new THREE.Mesh(pageGeo,[paperBackMat,paperBackMat,paperMat,paperBackMat,paperBackMat,paperBackMat]);
-pageL.position.x=-0.09; pageL.rotation.z=0.30; pageL.castShadow=true; bookGrp.add(pageL);
-const pageR=new THREE.Mesh(pageGeo.clone(),[paperBackMat,paperBackMat,paperMat,paperBackMat,paperBackMat,paperBackMat]);
-pageR.position.x=0.09; pageR.rotation.z=-0.30; pageR.castShadow=true; bookGrp.add(pageR);
-const pencil=new THREE.Group(); pencil.position.set(0.02,0.02,0.02); pencil.rotation.z=0.5; pencil.rotation.y=0.3;
-const pencilBody=new THREE.Mesh(new THREE.CylinderGeometry(0.006,0.006,0.16,16), new THREE.MeshStandardMaterial({color:0xd9a441,roughness:0.6}));
-pencilBody.rotation.x=Math.PI/2; pencil.add(pencilBody);
-const pencilTip=new THREE.Mesh(new THREE.ConeGeometry(0.006,0.02,16), new THREE.MeshStandardMaterial({color:0x2a2a2a,roughness:0.4}));
-pencilTip.rotation.x=-Math.PI/2; pencilTip.position.z=0.09; pencil.add(pencilTip);
-bookGrp.add(pencil);
-
-// ================= GNSS ROVER POLE (leaning on case) =================
-const gnssPivot=new THREE.Group(); gnssPivot.position.set(0.62,0,0.02);
-gnssPivot.rotation.z=-0.24; gnssPivot.rotation.x=-0.05; // negative z leans the pole toward +x, into the case
-const POLE_LEN=2.0;
-const gnssPole=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.013,POLE_LEN,20), poleMat);
-gnssPole.position.y=POLE_LEN/2; gnssPole.castShadow=true; gnssPivot.add(gnssPole);
-const puckBase=new THREE.Mesh(new THREE.CylinderGeometry(0.028,0.024,0.02,20), MATP.steel);
-puckBase.position.y=POLE_LEN+0.01; puckBase.castShadow=true; gnssPivot.add(puckBase);
-const puckDome=new THREE.Mesh(new THREE.SphereGeometry(0.045,20,12,0,Math.PI*2,0,Math.PI/2), new THREE.MeshStandardMaterial({color:0xf2f2f2,roughness:0.4,metalness:0.05}));
-puckDome.position.y=POLE_LEN+0.02; puckDome.castShadow=true; gnssPivot.add(puckDome);
-const ledMat=new THREE.MeshStandardMaterial({color:0xffb46a, emissive:0xffb46a, emissiveIntensity:0.2, roughness:0.4});
-const gnssLed=new THREE.Mesh(new THREE.SphereGeometry(0.006,8,8), ledMat);
-gnssLed.position.set(0.02,POLE_LEN-0.03,0.026); gnssPivot.add(gnssLed);
-g.add(gnssPivot);
-
-// ================= GRAVEL PAD + TUFTS + STAKE =================
-const pad=new THREE.Mesh(new THREE.CircleGeometry(1.5,40), new THREE.MeshStandardMaterial({map:gravelTex,roughness:1,metalness:0}));
-pad.rotation.x=-Math.PI/2; pad.position.set(0.45,0.004,-0.1); pad.receiveShadow=true; g.add(pad);
-
-const tuftPositions=[[-0.55,-0.7],[0.15,0.55],[1.5,0.35],[1.55,-0.55],[-0.2,-1.0]];
-for(const [tx,tz] of tuftPositions){
-  const tuftGrp=new THREE.Group(); tuftGrp.position.set(tx,0,tz);
-  const tuftMatI=new THREE.MeshStandardMaterial({map:tuftTex, roughness:0.9, transparent:true, side:THREE.DoubleSide, alphaTest:0.3});
-  const p1=new THREE.Mesh(new THREE.PlaneGeometry(0.22,0.22), tuftMatI); p1.position.y=0.11; tuftGrp.add(p1);
-  const p2=p1.clone(); p2.rotation.y=Math.PI/2; tuftGrp.add(p2);
-  g.add(tuftGrp);
-}
-
-const stakeGrp=new THREE.Group(); stakeGrp.position.set(-0.55,0,0.35); stakeGrp.rotation.z=0.14;
-const stake=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.016,0.45,16), woodMat);
-stake.position.y=0.225; stake.castShadow=true; stakeGrp.add(stake);
-const flagPivot=new THREE.Group(); flagPivot.position.set(0,0.4,0);
-const flag=new THREE.Mesh(new THREE.PlaneGeometry(0.12,0.09), flagMat);
-flag.position.set(0.06,0,0); flagPivot.add(flag);
-stakeGrp.add(flagPivot);
-g.add(stakeGrp);
-
-// ================= WARM PRACTICAL (standalone work light on a stand, aimed at the instrument) =================
-const lightStand=new THREE.Group(); lightStand.position.set(1.05,0,0.72);
-const standPole=new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.02,1.3,14), rubberMat);
-standPole.position.y=0.65; standPole.castShadow=true; lightStand.add(standPole);
-const standFoot=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.11,0.03,16), rubberMat);
-standFoot.position.y=0.015; lightStand.add(standFoot);
-const lightHousing=new THREE.Group(); lightHousing.position.set(0,1.32,0);
-const clampBody=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.07,0.1), rubberMat);
-clampBody.castShadow=true; lightHousing.add(clampBody);
-const lensDisc=new THREE.Mesh(new THREE.CircleGeometry(0.03,16), new THREE.MeshStandardMaterial({color:0xffdca8, emissive:0xffb46a, emissiveIntensity:1.1, roughness:0.3}));
-lensDisc.position.z=-0.052; lightHousing.add(lensDisc);
-lightStand.add(lightHousing);
-lightStand.lookAt(new THREE.Vector3().copy(g.position).add(new THREE.Vector3(tsGrp.position.x,1.2,tsGrp.position.z)));
-g.add(lightStand);
-const workLight=addPractical(new THREE.SpotLight(0xffb46a,14,7,.85,.55,1.6));
-g.add(workLight); g.add(workLight.target);
-workLight.position.set(lightStand.position.x,1.36,lightStand.position.z);
-workLight.target.position.set(tsGrp.position.x,1.1,tsGrp.position.z);
-
-// ================= UPDATE / LOOP =================
-SCENES.survey = {
-  group: g,
-  camPos: new THREE.Vector3().copy(P).addScaledVector(SD,-4.6).addScaledVector(TN,-5.4).setY(1.75),
-  lookAt: new THREE.Vector3(g.position.x, 1.15, g.position.z),
-  update:(time,act)=>{
-    // lens glint pulse
-    const glintI=0.6*(0.3+0.7*Math.abs(Math.sin(time*0.9)));
-    glintMat.emissiveIntensity=glintI*(0.7+0.3*act);
-    // GNSS LED sharp blink, 2s cycle, 0.15s on
-    const phase=time%2.0;
-    ledMat.emissiveIntensity = phase<0.15 ? 1.3 : 0.06;
-    // field-book page corner flutter
-    pageL.rotation.z=0.30+Math.sin(time*1.3)*0.012;
-    pageR.rotation.z=-0.30+Math.sin(time*1.3+1.1)*0.010;
-    flagPivot.rotation.y=Math.sin(time*1.6)*0.15;
-    // light breathing
-    workLight.intensity=(14+1.3*Math.sin(time*0.6))*(0.85+0.15*act);
-    lensDisc.material.emissiveIntensity=1.1+0.2*Math.sin(time*0.6);
-  }
-};
-}
-
-
-{ /* ---- SCENE: fiber ---- */
-const S=STOPS.find(s=>s.key==='fiber'); const t=S.t, P=rp(t), SD=sideOf(t), TN=rt(t);
-const OFF=2.6;
-const g=new THREE.Group();
-g.position.set(P.x+SD.x*OFF,0,P.z+SD.z*OFF);
-g.lookAt(P.x,0,P.z);
-scene.add(g);
-
-// ---- local layout constants (local -z runs toward line/road, see engine note) ----
-const LINE_Z=-OFF;              // main route line (offset 0)
-const ROAD_CTR_Z=LINE_Z-3.85;   // collector road centerline (ROAD_OFF)
-const ROAD_EDGE=ROAD_CTR_Z-3.45;// far curb of collector road (beyond = neighborhood side)
-const Z_END=-31;                // dead end of the side streets
-const STREET_HW=2.5;
-const ROW_OFF=STREET_HW+3+1.75; // street half-w + yard + house half-depth (depth faces the street after the 90 deg row rotation)
-
-// ================= TEXTURES (4 new ctex) =================
-const wallTex=ctex(512,512,(ctx,w,h)=>{
-  ctx.fillStyle='#c7bfae'; ctx.fillRect(0,0,w,h);
-  ctx.strokeStyle='rgba(85,78,64,0.32)'; ctx.lineWidth=2;
-  for(let y=0;y<h;y+=15){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
-  blotch(ctx,w,h,7,'rgba(60,54,42,$)',.04,.11,18,64);
-  grain(ctx,w,h,3200,.03,.09,true);
-},{rx:2,ry:1});
-const shingleTex=ctex(512,512,(ctx,w,h)=>{
-  ctx.fillStyle='#26262b'; ctx.fillRect(0,0,w,h);
-  ctx.strokeStyle='rgba(8,8,10,0.55)'; ctx.lineWidth=3;
-  for(let y=6;y<h;y+=17){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
-  grain(ctx,w,h,4200,.02,.08,true);
-},{rx:1,ry:2});
-const windowTex=ctex(256,256,(ctx,w,h)=>{
-  ctx.fillStyle='#2c2013'; ctx.fillRect(0,0,w,h);
-  ctx.fillStyle='#ffd9a0'; ctx.fillRect(w*0.08,h*0.08,w*0.84,h*0.84);
-  ctx.strokeStyle='#2a1c0e'; ctx.lineWidth=7;
-  ctx.beginPath(); ctx.moveTo(w/2,h*0.06); ctx.lineTo(w/2,h*0.94);
-  ctx.moveTo(w*0.06,h/2); ctx.lineTo(w*0.94,h/2); ctx.stroke();
-  grain(ctx,w,h,500,.02,.05,false);
-},{clamp:true});
-const cabinetTex=ctex(512,512,(ctx,w,h)=>{
-  ctx.fillStyle='#5c6a50'; ctx.fillRect(0,0,w,h);
-  ctx.fillStyle='rgba(0,0,0,0.2)';
-  for(let y=h*0.10;y<h*0.60;y+=15){ ctx.fillRect(w*0.1,y,w*0.8,6); }
-  blotch(ctx,w,h,9,'rgba(18,22,15,$)',.05,.14,14,58);
-  grain(ctx,w,h,2600,.03,.08,true);
-  ctx.textBaseline='middle'; ctx.font='800 30px Montserrat, Arial';
-  const s1='DRAF', s2='TECH', w1=ctx.measureText(s1).width, w2=ctx.measureText(s2).width;
-  const sx=w*0.5-(w1+w2)/2, sy=h*0.84;
-  ctx.textAlign='left';
-  ctx.fillStyle='#ffffff'; ctx.fillText(s1,sx,sy);
-  ctx.fillStyle='#19c8de'; ctx.fillText(s2,sx+w1,sy);
-},{clamp:true});
-
-// ================= HOUSE TEMPLATES =================
-const houseW=4.5, houseH=3.0, houseD=3.5;
-const houseBoxTemplate=new THREE.BoxGeometry(houseW,houseH,houseD);
-houseBoxTemplate.translate(0,houseH/2,0);
-
-const roofHalfW=houseW/2+0.15, roofApex=1.9, roofDepth=houseD+0.3;
-const roofShape=new THREE.Shape();
-roofShape.moveTo(-roofHalfW,0); roofShape.lineTo(roofHalfW,0); roofShape.lineTo(0,roofApex); roofShape.closePath();
-const roofTemplate=new THREE.ExtrudeGeometry(roofShape,{depth:roofDepth,bevelEnabled:false,curveSegments:1});
-roofTemplate.translate(0,houseH,-roofDepth/2);
-
-const chimneyTemplate=new THREE.BoxGeometry(.4,1.3,.4);
-chimneyTemplate.translate(1.3,houseH+0.75,0.3);
-
-const doorTemplate=new THREE.PlaneGeometry(.9,1.8);
-doorTemplate.translate(-1.4,0.9,houseD/2+0.02);
-
-const w1g=new THREE.PlaneGeometry(.8,1.0); w1g.translate(-1.55,1.65,houseD/2+0.02);
-const w2g=new THREE.PlaneGeometry(.8,1.0); w2g.translate(0,1.65,houseD/2+0.02);
-const w3g=new THREE.PlaneGeometry(.8,1.0); w3g.translate(1.55,1.65,houseD/2+0.02);
-const windowsTemplate=BGU.mergeGeometries([w1g,w2g,w3g]);
-
-const driveTemplate=new THREE.PlaneGeometry(1.8,2.8);
-driveTemplate.rotateX(-Math.PI/2);
-driveTemplate.translate(1.3,0.015,houseD/2+1.4);
-
-// ================= HOUSE INSTANCING =================
-const wallGeosA=[], wallGeosB=[], roofGeos=[], chimneyGeos=[], doorGeos=[], driveGeos=[];
-const windowGeosByGroup=[[],[],[],[]];
-
-function addHouse(rowX,z,rotY,group,toneB){
-  const scaleVar=0.94+Math.random()*0.14;
-  const jitter=(Math.random()-0.5)*0.12;
-  const m=new THREE.Matrix4().compose(
-    new THREE.Vector3(rowX,0,z),
-    new THREE.Quaternion().setFromEuler(new THREE.Euler(0,rotY+jitter,0)),
-    new THREE.Vector3(scaleVar,scaleVar,scaleVar)
-  );
-  const bg=houseBoxTemplate.clone(); bg.applyMatrix4(m); (toneB?wallGeosB:wallGeosA).push(bg);
-  const rg=roofTemplate.clone(); rg.applyMatrix4(m); roofGeos.push(rg);
-  const cg=chimneyTemplate.clone(); cg.applyMatrix4(m); chimneyGeos.push(cg);
-  const dg=doorTemplate.clone(); dg.applyMatrix4(m); doorGeos.push(dg);
-  const wg=windowsTemplate.clone(); wg.applyMatrix4(m); windowGeosByGroup[group].push(wg);
-  const vg=driveTemplate.clone(); vg.applyMatrix4(m); driveGeos.push(vg);
-}
-
-const groupsDef=[
-  {cx:-9,s:-1,group:0},
-  {cx:-9,s: 1,group:1},
-  {cx:11,s:-1,group:2},
-  {cx:11,s: 1,group:3},
-];
-const zRow=[-12,-17,-22,-27];
-let hIdx=0;
-for(const gd of groupsDef){
-  const rowX=gd.cx+gd.s*ROW_OFF;
-  const rotY=-gd.s*Math.PI/2;
-  for(const z of zRow){ addHouse(rowX,z,rotY,gd.group,hIdx%2===0); hIdx++; }
-}
-
-const wallMatA=new THREE.MeshStandardMaterial({map:wallTex,color:0xdccBA8,roughness:.88});
-const wallMatB=new THREE.MeshStandardMaterial({map:wallTex,color:0xaebac2,roughness:.88});
-const roofMat=new THREE.MeshStandardMaterial({map:shingleTex,color:0x35363c,roughness:.95});
-const doorMat=new THREE.MeshStandardMaterial({color:0x3a2a1c,roughness:.75});
-const driveMat=new THREE.MeshStandardMaterial({map:asphaltTex,color:0x5a5a5a,roughness:1});
-const windowMats=[0,1,2,3].map(()=>new THREE.MeshStandardMaterial({
-  map:windowTex,color:0x14100c,emissive:0xffb763,emissiveMap:windowTex,emissiveIntensity:0,roughness:.5,metalness:.05
-}));
-
-function mergeAndAdd(arr,mat,cast,receive){
-  if(!arr.length) return;
-  const mesh=new THREE.Mesh(BGU.mergeGeometries(arr),mat);
-  mesh.castShadow=!!cast; mesh.receiveShadow=!!receive;
-  g.add(mesh);
-}
-mergeAndAdd(wallGeosA,wallMatA,true,true);
-mergeAndAdd(wallGeosB,wallMatB,true,true);
-mergeAndAdd(roofGeos,roofMat,true,false);
-mergeAndAdd(chimneyGeos,MATP.dark,true,false);
-mergeAndAdd(doorGeos,doorMat,false,false);
-mergeAndAdd(driveGeos,driveMat,false,true);
-for(let k=0;k<4;k++) mergeAndAdd(windowGeosByGroup[k],windowMats[k],false,false);
-
-// ================= GROUND PAD =================
-const groundGeo=new THREE.PlaneGeometry(60,28);
-groundGeo.rotateX(-Math.PI/2);
-const groundMesh=new THREE.Mesh(groundGeo,new THREE.MeshStandardMaterial({map:groundTex,color:0x53644c,roughness:1}));
-groundMesh.position.set(2,0.006,-20.5);
-groundMesh.receiveShadow=true;
-g.add(groundMesh);
-
-// ================= SIDE STREETS + CURBS =================
-const streetMat=new THREE.MeshStandardMaterial({map:asphaltTex,roughnessMap:asphaltRough,color:0x9a9a9a,roughness:1});
-const curbMat=new THREE.MeshStandardMaterial({map:curbTex,color:0xbdbdbd,roughness:.9});
-function addStreet(cx){
-  const len=Math.abs(Z_END-ROAD_EDGE), midZ=(ROAD_EDGE+Z_END)/2;
-  const sMesh=new THREE.Mesh(new THREE.BoxGeometry(STREET_HW*2,.05,len),streetMat);
-  sMesh.position.set(cx,0.025,midZ); sMesh.receiveShadow=true; g.add(sMesh);
-  for(const s of [-1,1]){
-    const cMesh=new THREE.Mesh(new THREE.BoxGeometry(.3,.16,len),curbMat);
-    cMesh.position.set(cx+s*(STREET_HW+0.15),0.08,midZ);
-    cMesh.castShadow=true; cMesh.receiveShadow=true; g.add(cMesh);
-  }
-}
-addStreet(-9); addStreet(11);
-
-// ================= TREES =================
-const treeMat=new THREE.MeshStandardMaterial({map:treeTex,transparent:true,alphaTest:.5,side:THREE.DoubleSide,roughness:1});
-function addTree(x,z,sc){
-  const g1=new THREE.PlaneGeometry(3*sc,4*sc); g1.translate(0,2*sc,0);
-  const g2=g1.clone(); g2.rotateY(Math.PI/2);
-  const m1=new THREE.Mesh(g1,treeMat), m2=new THREE.Mesh(g2,treeMat);
-  m1.position.set(x,0,z); m2.position.set(x,0,z);
-  m1.castShadow=true; m2.castShadow=true;
-  g.add(m1); g.add(m2);
-}
-const rowA_l=-9-ROW_OFF, rowA_r=-9+ROW_OFF, rowB_l=11-ROW_OFF, rowB_r=11+ROW_OFF;
-addTree(rowA_l-1.6,-14.5,1.1);
-addTree(rowA_r+1.6,-19.5,1.0);
-addTree(rowB_l-1.6,-24.5,1.15);
-addTree(rowB_r+1.6,-14.5,0.95);
-addTree(-9-STREET_HW-2.2,ROAD_EDGE-1,1.0);
-addTree(11+STREET_HW+2.2,Z_END+1.5,1.05);
-
-// ================= FIBER CABINET =================
-const cabW=.8,cabH=1.1,cabD=.5;
-const cabGeo=new THREE.BoxGeometry(cabW,cabH,cabD); cabGeo.translate(0,cabH/2,0);
-const cabFrontMat=new THREE.MeshStandardMaterial({map:cabinetTex,roughness:.6,metalness:.25});
-const cabMesh=new THREE.Mesh(cabGeo,[MATP.steel,MATP.steel,MATP.steel,MATP.steel,cabFrontMat,MATP.steel]);
-cabMesh.position.set(-12.6,0,ROAD_EDGE+0.6);
-cabMesh.rotation.y=0.35;
-cabMesh.castShadow=true; cabMesh.receiveShadow=true;
-g.add(cabMesh);
-const led=new THREE.Mesh(new THREE.SphereGeometry(.018,8,8),new THREE.MeshStandardMaterial({color:0x0c2c30,emissive:0x19c8de,emissiveIntensity:1.2}));
-led.position.set(cabW/2-0.08,cabH-0.15,cabD/2+0.01);
-cabMesh.add(led);
-
-// ================= LATERAL FIBER LINES + NODE PUCKS =================
-const tubeSegs=isMobile?24:40, radSegs=isMobile?6:8;
-const lateralMats=[], nodeMats=[];
-function addLateral(cx,s,group){
-  const edgeX=cx+s*(STREET_HW+0.15);
-  const midZ=(LINE_Z+ROAD_EDGE)/2;
-  const curve=new THREE.CatmullRomCurve3([
-    new THREE.Vector3(cx,0.06,LINE_Z),
-    new THREE.Vector3(cx+s*1.2,0.065,midZ),
-    new THREE.Vector3(edgeX,0.07,ROAD_EDGE+0.3),
-    new THREE.Vector3(edgeX,0.075,(ROAD_EDGE+Z_END)/2),
-    new THREE.Vector3(edgeX,0.08,Z_END+2)
-  ]);
-  const tMat=new THREE.MeshStandardMaterial({color:0x0c2c30,emissive:0x19c8de,emissiveIntensity:0,roughness:.4,metalness:.15});
-  const tMesh=new THREE.Mesh(new THREE.TubeGeometry(curve,tubeSegs,.022,radSegs,false),tMat);
-  g.add(tMesh);
-  lateralMats[group]=tMat;
-  const nMat=new THREE.MeshStandardMaterial({color:0x0c2c30,emissive:0x19c8de,emissiveIntensity:.6,roughness:.35,metalness:.2});
-  const node=new THREE.Mesh(new THREE.CylinderGeometry(.09,.1,.05,16),nMat);
-  node.position.set(edgeX,0.05,Z_END+2);
-  node.castShadow=true;
-  g.add(node);
-  nodeMats[group]=nMat;
-}
-addLateral(-9,-1,0); addLateral(-9,1,1); addLateral(11,-1,2); addLateral(11,1,3);
-
-// ================= PRACTICAL LIGHT =================
-const lampLight=addPractical(new THREE.PointLight(0xffb763,0.55,42,2));
-lampLight.position.set(2,7,-20.5);
-g.add(lampLight);
-
-// ================= CAMERA =================
-const camPos=new THREE.Vector3().copy(P).addScaledVector(SD,-2).addScaledVector(TN,-13); camPos.y=30;
-const lookAt=new THREE.Vector3().copy(P).addScaledVector(TN,10); lookAt.y=0;
-
-// ================= LOOP =================
-const N=4, PERIOD=6;
-function wrap01(x){ return ((x%1)+1)%1; }
-SCENES.fiber={
-  group:g, camPos, lookAt,
-  update:(time,act)=>{
-    const base=0.35+0.65*Math.max(0,Math.min(1,act));
-    for(let k=0;k<N;k++){
-      const u=wrap01(time/PERIOD-k/N);
-      const f=smoothstepJS(0,.12,u)*(1-smoothstepJS(.8,1,u));
-      lateralMats[k].emissiveIntensity=f*1.6*base;
-      const uh=wrap01(time/PERIOD-k/N-0.4/PERIOD);
-      const fh=smoothstepJS(0,.12,uh)*(1-smoothstepJS(.8,1,uh));
-      windowMats[k].emissiveIntensity=fh*1.4*base;
-      nodeMats[k].emissiveIntensity=0.5+0.25*Math.sin(time*2.4+k*1.7)+f*1.0;
-    }
-    led.material.emissiveIntensity=1.0+0.15*Math.sin(time*5.0);
-    lampLight.intensity=0.5+0.06*Math.sin(time*0.7);
-  }
-};
-}
-
-
-{ /* ---- SCENE: osp ---- */
-const S = STOPS.find(s=>s.key==='osp');
-const t = S.t, P = rp(t), SD = sideOf(t), TN = rt(t);
-const NEUT_Y=7.2, COMM_Y=[5.9,5.55,5.2];
-const K = 2.6;
-
-const g = new THREE.Group();
-g.position.set(P.x+SD.x*K, 0, P.z+SD.z*K);
-g.lookAt(P.x,0,P.z);
-scene.add(g);
-
-// ---------- textures ----------
-function cropClone(src,rx,ry,ox,oy){ const tx=src.clone(); tx.needsUpdate=true; tx.repeat.set(rx,ry); tx.offset.set(ox,oy); return tx; }
-
-const cabinetTex = ctex(1024,1024,(ctx,w,h)=>{
-  ctx.fillStyle='#5b5f49'; ctx.fillRect(0,0,w,h*0.62);
-  ctx.fillStyle='#7d806e'; ctx.fillRect(0,h*0.62,w,h*0.38);
-  ctx.fillStyle='rgba(0,0,0,0.22)'; ctx.fillRect(0,h*0.605,w,h*0.02);
-  grain(ctx,w,h,2400,0.04,0.16,0.5);
-  blotch(ctx,w,h,14,'rgba(35,40,22,$)',0.06,0.18,20,90);
-  blotch(ctx,w,h,7,'rgba(95,72,38,$)',0.05,0.13,15,55);
-},{});
-
-const concreteTex = ctex(1024,1024,(ctx,w,h)=>{
-  ctx.fillStyle='#9a978c'; ctx.fillRect(0,0,w,h);
-  grain(ctx,w,h,3200,0.03,0.13,0.55);
-  blotch(ctx,w,h,10,'rgba(48,46,38,$)',0.05,0.16,30,140);
-  blotch(ctx,w,h,6,'rgba(18,18,14,$)',0.05,0.12,15,60);
-  ctx.save();
-  ctx.translate(w*0.5,h*0.5);
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.font='800 150px Arial';
-  ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.fillText('COMM',5,6);
-  ctx.fillStyle='rgba(255,255,255,0.22)'; ctx.fillText('COMM',-4,-5);
-  ctx.fillStyle='rgba(140,138,126,0.9)'; ctx.fillText('COMM',0,0);
-  ctx.restore();
-},{});
-
-const hazardTex = ctex(1024,512,(ctx,w,h)=>{
-  const hw=w/2;
-  ctx.save();
-  ctx.fillStyle='#f2c318'; ctx.fillRect(0,0,hw,h);
-  ctx.fillStyle='rgba(25,22,15,0.8)';
-  for(let i=-2;i<9;i++){ ctx.save(); ctx.translate(i*90,0); ctx.rotate(-0.45); ctx.fillRect(-20,-h,42,h*3); ctx.restore(); }
-  grain(ctx,hw,h,800,0.05,0.16,0.5);
-  blotch(ctx,hw,h,8,'rgba(70,55,15,$)',0.08,0.2,14,44);
-  ctx.restore();
-  ctx.save();
-  ctx.translate(hw,0);
-  ctx.fillStyle='#e4570f'; ctx.fillRect(0,0,hw,h);
-  ctx.fillStyle='#eef0ea'; ctx.fillRect(0,h*0.36,hw,h*0.26);
-  ctx.fillStyle='rgba(255,255,255,0.3)';
-  for(let i=0;i<50;i++) ctx.fillRect(Math.random()*hw, h*0.36+Math.random()*h*0.26, 2.5,2.5);
-  grain(ctx,hw,h,700,0.04,0.14,0.4);
-  blotch(ctx,hw,h,6,'rgba(90,40,10,$)',0.06,0.16,12,36);
-  ctx.restore();
-},{});
-
-const labelTex = ctex(512,192,(ctx,w,h)=>{
-  ctx.fillStyle='#14171a'; ctx.fillRect(0,0,w,h);
-  ctx.strokeStyle='rgba(200,200,200,0.5)'; ctx.lineWidth=4; ctx.strokeRect(6,6,w-12,h-12);
-  ctx.textBaseline='middle'; ctx.textAlign='left';
-  ctx.font='800 92px Montserrat, Arial';
-  ctx.fillStyle='#f3f5f6'; ctx.fillText('DRAF',30,h*0.5);
-  const draW = ctx.measureText('DRAF').width;
-  ctx.fillStyle='#19c8de'; ctx.fillText('TECH',30+draW,h*0.5);
-  ctx.font='600 26px Arial'; ctx.fillStyle='rgba(230,230,230,0.7)';
-  ctx.fillText('OSP ASSET',30,h*0.84);
-},{});
-
-const padMat = new THREE.MeshStandardMaterial({map:cropClone(concreteTex,0.28,0.28,0.02,0.7), roughness:.95, metalness:.02});
-const collarMat = new THREE.MeshStandardMaterial({map:cropClone(concreteTex,0.3,0.3,0.68,0.02), roughness:.95, metalness:.02});
-const lidMat = new THREE.MeshStandardMaterial({map:cropClone(concreteTex,1,1,0,0), roughness:.9, metalness:.02});
-const guyGuardMat = new THREE.MeshStandardMaterial({map:cropClone(hazardTex,0.5,1,0,0), roughness:.7, metalness:.05, side:THREE.DoubleSide});
-const coneMat = new THREE.MeshStandardMaterial({map:cropClone(hazardTex,0.5,1,0.5,0), roughness:.55, metalness:.02});
-const cabinetMat = new THREE.MeshStandardMaterial({map:cabinetTex, roughness:.72, metalness:.15});
-const darkTrimMat = new THREE.MeshStandardMaterial({color:0x17181a, roughness:.8, metalness:.1});
-
-// ============================================================
-// 1) HERO JOINT-USE POLE + OSP HARDWARE
-// ============================================================
-const poleGrp = new THREE.Group();
-for (const it of poleSpec()){
-  const m = new THREE.Mesh(it.g, MATP[it.b]);
-  m.position.set(...it.p);
-  if (it.r) m.rotation.set(...it.r);
-  m.castShadow = true;
-  poleGrp.add(m);
-}
-poleGrp.position.set(0.55,0,1.5);
-poleGrp.rotation.y = -0.22;
-g.add(poleGrp);
-
-// transformer can
-const canPos = new THREE.Vector3(0.16,7.6,-0.34);
-const canGeo = new THREE.CylinderGeometry(0.32,0.32,0.85,24);
-const can = new THREE.Mesh(canGeo, MATP.steel);
-can.position.copy(canPos);
-can.castShadow = true;
-poleGrp.add(can);
-for(const dy of [-0.28,-0.09,0.1,0.29]){
-  const rib = new THREE.Mesh(new THREE.TorusGeometry(0.335,0.02,8,24), MATP.steel);
-  rib.rotation.x = Math.PI/2;
-  rib.position.set(canPos.x,canPos.y+dy,canPos.z);
-  poleGrp.add(rib);
-}
-const canBracket = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.5,0.08), MATP.steel);
-canBracket.position.set(0.06,7.6,-0.17);
-canBracket.rotation.y = -0.5;
-canBracket.castShadow = true;
-poleGrp.add(canBracket);
-
-// splice case on middle comm cable
-const splicePos = new THREE.Vector3(0.3,COMM_Y[1],-0.3);
-const splice = new THREE.Mesh(new THREE.CapsuleGeometry(0.065,0.4,4,16), MATP.dark);
-splice.rotation.z = Math.PI/2;
-splice.position.copy(splicePos);
-splice.castShadow = true;
-poleGrp.add(splice);
-for(const dx of [-0.13,0.13]){
-  const clamp = new THREE.Mesh(new THREE.TorusGeometry(0.075,0.014,8,16), MATP.steel);
-  clamp.rotation.y = Math.PI/2;
-  clamp.position.set(splicePos.x+dx,splicePos.y,splicePos.z);
-  poleGrp.add(clamp);
-}
-
-// coiled service loop on snowshoe bracket
-const snowshoe = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.32,0.02), MATP.steel);
-snowshoe.position.set(0.16,4.5,-0.14);
-snowshoe.rotation.y = -0.3;
-snowshoe.castShadow = true;
-poleGrp.add(snowshoe);
-const coilMat = new THREE.MeshStandardMaterial({color:0x18191b, roughness:.85, metalness:.15});
-const coil = new THREE.Mesh(new THREE.TorusGeometry(0.22,0.022,8,32,Math.PI*1.5), coilMat);
-coil.position.set(0.3,4.5,-0.28);
-coil.rotation.y = -0.3;
-coil.castShadow = true;
-poleGrp.add(coil);
-
-// vertical riser U-guard conduit
-const riser = new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.055,COMM_Y[2],16,1,true,0,Math.PI), MATP.steel);
-riser.position.set(0.22,COMM_Y[2]/2,-0.2);
-riser.rotation.y = Math.PI/2;
-riser.castShadow = true;
-poleGrp.add(riser);
-
-// down-guy wire + yellow guy guard
-const guyTop = new THREE.Vector3(0.15,NEUT_Y,-0.1);
-const guyAnchor = new THREE.Vector3(2.3,0,1.7);
-const guyDir = new THREE.Vector3().subVectors(guyAnchor,guyTop);
-const guyLen = guyDir.length();
-const guyDirN = guyDir.clone().normalize();
-const guyMat = new THREE.MeshStandardMaterial({color:0x24272b, roughness:.55, metalness:.6});
-const guyWire = new THREE.Mesh(new THREE.CylinderGeometry(0.011,0.011,1,16), guyMat);
-guyWire.scale.y = guyLen;
-guyWire.position.copy(guyTop).addScaledVector(guyDirN,guyLen/2);
-guyWire.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),guyDirN);
-guyWire.castShadow = true;
-poleGrp.add(guyWire);
-
-const guardLen = 1.7;
-const guardUpDir = guyDirN.clone().negate();
-const guyGuard = new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,1,16,1,true,0,Math.PI), guyGuardMat);
-guyGuard.scale.y = guardLen;
-guyGuard.position.copy(guyAnchor).addScaledVector(guardUpDir,guardLen/2);
-guyGuard.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),guyDirN);
-guyGuard.rotateY(0.7);
-guyGuard.castShadow = true;
-poleGrp.add(guyGuard);
-
-// ============================================================
-// 2) PAD CABINET
-// ============================================================
-const cabinetGrp = new THREE.Group();
-const padH=0.12, cabW=0.66, cabD=0.5, cabH=1.15;
-const pad = new THREE.Mesh(new THREE.BoxGeometry(0.92,padH,0.78), padMat);
-pad.position.set(0,padH/2,0);
-pad.receiveShadow = true;
-cabinetGrp.add(pad);
-
-const cabinetBody = new THREE.Mesh(new THREE.BoxGeometry(cabW,cabH,cabD), cabinetMat);
-cabinetBody.position.set(0,padH+cabH/2,0);
-cabinetBody.castShadow = true;
-cabinetBody.receiveShadow = true;
-cabinetGrp.add(cabinetBody);
-
-const seam = new THREE.Mesh(new THREE.BoxGeometry(0.012,cabH*0.9,0.02), darkTrimMat);
-seam.position.set(0,padH+cabH/2,cabD/2+0.006);
-cabinetGrp.add(seam);
-
-for(let i=0;i<5;i++){
-  const louver = new THREE.Mesh(new THREE.BoxGeometry(cabW*0.7,0.018,0.015), darkTrimMat);
-  louver.position.set(0, padH+cabH*0.78+i*0.032, cabD/2+0.006);
-  cabinetGrp.add(louver);
-}
-
-const hasp = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.09,0.02), MATP.steel);
-hasp.position.set(cabW*0.28, padH+cabH*0.42, cabD/2+0.01);
-hasp.castShadow = true;
-cabinetGrp.add(hasp);
-const shackle = new THREE.Mesh(new THREE.TorusGeometry(0.028,0.006,8,16,Math.PI), MATP.steel);
-shackle.position.set(cabW*0.28, padH+cabH*0.42+0.05, cabD/2+0.012);
-shackle.rotation.z = Math.PI;
-cabinetGrp.add(shackle);
-
-const ledMat = new THREE.MeshStandardMaterial({color:0x19c8de, emissive:0x19c8de, emissiveIntensity:0.3, roughness:.4, metalness:0});
-const led = new THREE.Mesh(new THREE.SphereGeometry(0.012,12,12), ledMat);
-led.position.set(-cabW*0.32, padH+cabH*0.92, cabD/2+0.012);
-cabinetGrp.add(led);
-
-const tag = new THREE.Mesh(new THREE.PlaneGeometry(0.16,0.06), new THREE.MeshStandardMaterial({map:labelTex, roughness:.5, metalness:.1}));
-tag.position.set(cabW*0.02, padH+cabH*0.12, cabD/2+0.008);
-cabinetGrp.add(tag);
-
-cabinetGrp.position.set(-1.05,0,0.75);
-cabinetGrp.rotation.y = 0.35;
-g.add(cabinetGrp);
-
-// ============================================================
-// 3) OPEN HANDHOLE + BRANCH TIE-IN
-// ============================================================
-const handholeGrp = new THREE.Group();
-const outerW=1.0, outerD=0.7, wall=0.12, collarH=0.18, baseY=-0.04;
-const cY = baseY+collarH/2;
-const dirtPatch = new THREE.Mesh(new THREE.CircleGeometry(0.9,24), new THREE.MeshStandardMaterial({color:0x2b241c,roughness:1,metalness:0}));
-dirtPatch.rotation.x = -Math.PI/2;
-dirtPatch.position.set(0,0.012,0);
-dirtPatch.receiveShadow = true;
-handholeGrp.add(dirtPatch);
-
-const wallN = new THREE.Mesh(new THREE.BoxGeometry(outerW,collarH,wall), collarMat);
-wallN.position.set(0,cY,-(outerD/2-wall/2));
-wallN.castShadow = true; wallN.receiveShadow = true;
-handholeGrp.add(wallN);
-const wallS = wallN.clone();
-wallS.position.set(0,cY,(outerD/2-wall/2));
-handholeGrp.add(wallS);
-const wallE = new THREE.Mesh(new THREE.BoxGeometry(wall,collarH,outerD-2*wall), collarMat);
-wallE.position.set((outerW/2-wall/2),cY,0);
-wallE.castShadow = true; wallE.receiveShadow = true;
-handholeGrp.add(wallE);
-const wallW = wallE.clone();
-wallW.position.set(-(outerW/2-wall/2),cY,0);
-handholeGrp.add(wallW);
-
-const interiorMat = new THREE.MeshStandardMaterial({color:0x0d0d0e, roughness:1, metalness:0});
-const interior = new THREE.Mesh(new THREE.BoxGeometry(outerW-2*wall-0.04,0.55,outerD-2*wall-0.04), interiorMat);
-interior.position.set(0,-0.295,0);
-handholeGrp.add(interior);
-
-const stubOrange = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.32,16), new THREE.MeshStandardMaterial({color:0xff6a1f,roughness:.5,metalness:0}));
-stubOrange.position.set(-0.15,-0.41,0.05);
-stubOrange.castShadow = true;
-handholeGrp.add(stubOrange);
-const stubGrey = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.32,16), new THREE.MeshStandardMaterial({color:0x9a9a9a,roughness:.5,metalness:.3}));
-stubGrey.position.set(0.18,-0.41,-0.08);
-stubGrey.castShadow = true;
-handholeGrp.add(stubGrey);
-
-const lid = new THREE.Mesh(new THREE.BoxGeometry(0.92,0.06,0.66), lidMat);
-lid.position.set(0,0.32,0.62);
-lid.rotation.x = 1.1;
-lid.castShadow = true;
-lid.receiveShadow = true;
-handholeGrp.add(lid);
-
-handholeGrp.position.set(0.45,0,-1.85);
-g.add(handholeGrp);
-
-// branch tube tee-ing from the main route line into the vault
-const branchPts = [
-  new THREE.Vector3(-0.6,0.05,-2.6),
-  new THREE.Vector3(-0.15,-0.08,-2.32),
-  new THREE.Vector3(0.25,-0.42,-2.0),
-  new THREE.Vector3(0.7,-0.4,-1.85),
-  new THREE.Vector3(1.2,-0.06,-2.15),
-  new THREE.Vector3(1.9,0.05,-2.6)
-];
-const branchCurve = new THREE.CatmullRomCurve3(branchPts,false,'catmullrom',0.5);
-const branchGeo = varTube(branchCurve,40,8,()=>0.015);
-const branchMat = new THREE.MeshStandardMaterial({color:0x061014, emissive:0x22d3ee, emissiveIntensity:1.0, roughness:.4, metalness:.1});
-const branchTube = new THREE.Mesh(branchGeo, branchMat);
-branchTube.castShadow = true;
-g.add(branchTube);
-
-// ============================================================
-// 4) CONTEXT: gravel pad, tufts, traffic cone
-// ============================================================
-const gravelPlane = new THREE.Mesh(new THREE.PlaneGeometry(7,6), new THREE.MeshStandardMaterial({map:gravelTex, roughness:1, metalness:0}));
-gravelPlane.rotation.x = -Math.PI/2;
-gravelPlane.position.set(0.1,0.005,-0.3);
-gravelPlane.receiveShadow = true;
-g.add(gravelPlane);
-
-for(const tp of [[-0.3,0.15,-0.1],[1.55,-0.9,0.4]]){
-  const tuft = new THREE.Mesh(new THREE.PlaneGeometry(0.28,0.24), new THREE.MeshStandardMaterial({map:tuftTex, roughness:1, transparent:true, side:THREE.DoubleSide}));
-  tuft.position.set(tp[0],0.12,tp[1]);
-  tuft.rotation.y = tp[2];
-  g.add(tuft);
-}
-
-const coneGrp = new THREE.Group();
-const coneBase = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.04,0.32), new THREE.MeshStandardMaterial({color:0x101010,roughness:.9,metalness:0}));
-coneBase.position.y = 0.02;
-coneBase.castShadow = true; coneBase.receiveShadow = true;
-coneGrp.add(coneBase);
-const coneBody = new THREE.Mesh(new THREE.ConeGeometry(0.18,0.45,24), coneMat);
-coneBody.position.y = 0.04+0.225;
-coneBody.castShadow = true;
-coneGrp.add(coneBody);
-coneGrp.position.set(1.05,0,-1.55);
-g.add(coneGrp);
-
-// ============================================================
-// 5) PRACTICAL LIGHTING: work-light tripod at the handhole
-// ============================================================
-const tripod = new THREE.Group();
-const legMat = new THREE.MeshStandardMaterial({color:0x2b2b2b, roughness:.55, metalness:.5});
-const apexY = 1.0;
-for(let i=0;i<3;i++){
-  const pivot = new THREE.Group();
-  pivot.rotation.y = i*Math.PI*2/3;
-  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.014,0.02,1.05,16), legMat);
-  leg.rotation.x = 0.32;
-  leg.position.set(0, apexY-Math.cos(0.32)*1.05/2, Math.sin(0.32)*1.05/2);
-  leg.castShadow = true;
-  pivot.add(leg);
-  tripod.add(pivot);
-}
-const head = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.08,0.14,16), new THREE.MeshStandardMaterial({color:0x222222,roughness:.5,metalness:.6}));
-head.position.y = apexY;
-head.castShadow = true;
-tripod.add(head);
-tripod.position.set(1.2,0,-2.4);
-tripod.rotation.y = 0.6;
-g.add(tripod);
-
-const workLight = addPractical(new THREE.SpotLight(0xffb763,5,9,0.8,0.35,1.4));
-workLight.position.set(1.2,apexY,-2.4);
-workLight.target.position.set(0.45,-0.15,-1.85);
-workLight.castShadow = true;
-workLight.shadow.mapSize.set(512,512);
-workLight.shadow.bias = -0.002;
-g.add(workLight, workLight.target);
-
-const fillLight = addPractical(new THREE.PointLight(0xffb763,0.5,3,2));
-fillLight.position.set(-1.0,1.05,0.7);
-g.add(fillLight);
-
-// ============================================================
-// CAMERA
-// ============================================================
-const camPos = new THREE.Vector3().copy(P).addScaledVector(SD,-4.6).addScaledVector(TN,-6.2);
-camPos.y = 2.05;
-const lookAt = new THREE.Vector3(g.position.x,1.6,g.position.z);
-
-// ============================================================
-// LOOP
-// ============================================================
-function update(time,act){
-  const cyc = time % 2.4;
-  const blip=(x,c,w)=>{ const d=Math.abs(x-c); return d<w ? (1-d/w) : 0; };
-  const beat = Math.pow(blip(cyc,0.18,0.14),1.5) + Math.pow(blip(cyc,0.5,0.14),1.5);
-  ledMat.emissiveIntensity = 0.25 + beat*2.6*(0.4+0.6*act);
-
-  branchMat.emissiveIntensity = 1.0 + 0.8*Math.sin(time*2.2);
-
-  workLight.intensity = 5*(1+.04*Math.sin(time*13.7)+.03*Math.sin(time*7.3));
-}
-
-SCENES.osp = { group:g, camPos, lookAt, update };
-}
-
-
-{ /* ---- SCENE: cad ---- */
-const S=STOPS.find(s=>s.key==='cad'); const t=S.t, P=rp(t), SD=sideOf(t), TN=rt(t);
-const g=new THREE.Group(); g.position.set(P.x+SD.x*2.6, 0, P.z+SD.z*2.6); g.lookAt(P.x,0,P.z); scene.add(g);
-
-const DEG=THREE.MathUtils.degToRad;
-
-// ---------- route path (normalized 0..1 canvas coords) shared between screen draw + cursor tracer ----------
-const ROUTE_PTS=[[0.085,0.815],[0.19,0.77],[0.315,0.635],[0.285,0.46],[0.415,0.315],[0.585,0.29],[0.70,0.195],[0.885,0.135]];
-
-// ================= TEXTURES (3 new ctex) =================
-const screenTex=ctex(2048,1150,(ctx,w,h)=>{
-  ctx.fillStyle='#0b0f14'; ctx.fillRect(0,0,w,h);
-  // faint grid dots
-  ctx.fillStyle='rgba(130,155,170,0.10)';
-  for(let y=64;y<h-46;y+=30){ for(let x=96;x<w-24;x+=30){ ctx.beginPath(); ctx.arc(x,y,1.1,0,Math.PI*2); ctx.fill(); } }
-  // corridor linework (grey)
-  ctx.strokeStyle='rgba(150,168,178,0.32)'; ctx.lineWidth=1.4;
-  ctx.beginPath(); ctx.moveTo(w*0.06,h*0.90); ctx.lineTo(w*0.30,h*0.70); ctx.lineTo(w*0.55,h*0.40); ctx.lineTo(w*0.92,h*0.10); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(w*0.10,h*0.92); ctx.lineTo(w*0.34,h*0.72); ctx.lineTo(w*0.58,h*0.43); ctx.lineTo(w*0.94,h*0.14); ctx.stroke();
-  ctx.strokeRect(w*0.40,h*0.20,w*0.22,h*0.16);
-  ctx.strokeRect(w*0.62,h*0.52,w*0.16,h*0.14);
-  // dim green parcels
-  ctx.fillStyle='rgba(95,175,115,0.07)'; ctx.fillRect(w*0.40,h*0.20,w*0.22,h*0.16); ctx.fillRect(w*0.62,h*0.52,w*0.16,h*0.14);
-  ctx.strokeStyle='rgba(110,195,135,0.28)'; ctx.lineWidth=1.1;
-  ctx.strokeRect(w*0.40,h*0.20,w*0.22,h*0.16); ctx.strokeRect(w*0.62,h*0.52,w*0.16,h*0.14);
-  // dim orange existing utilities
-  ctx.strokeStyle='rgba(212,142,72,0.38)'; ctx.lineWidth=1.3;
-  ctx.beginPath(); ctx.moveTo(w*0.05,h*0.30); ctx.lineTo(w*0.95,h*0.55); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(w*0.15,h*0.05); ctx.lineTo(w*0.35,h*0.95); ctx.stroke();
-  // THE ROUTE cyan polyline w/ glow
-  const pts=ROUTE_PTS.map(p=>[p[0]*w,p[1]*h]);
-  for(let pass=0;pass<3;pass++){
-    ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]);
-    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]);
-    ctx.lineCap='round'; ctx.lineJoin='round';
-    ctx.lineWidth = pass===0?11:(pass===1?6:2.4);
-    ctx.strokeStyle = pass===2 ? 'rgba(150,240,255,0.95)' : `rgba(40,205,235,${0.10+pass*0.06})`;
-    ctx.stroke();
-  }
-  // station ticks
-  ctx.strokeStyle='rgba(190,245,255,0.75)'; ctx.lineWidth=1.6;
-  for(let i=1;i<pts.length-1;i++){
-    const [x,y]=pts[i]; const dx=pts[i+1][0]-pts[i-1][0], dy=pts[i+1][1]-pts[i-1][1];
-    const len=Math.hypot(dx,dy)||1, nx=-dy/len, ny=dx/len;
-    ctx.beginPath(); ctx.moveTo(x-nx*7,y-ny*7); ctx.lineTo(x+nx*7,y+ny*7); ctx.stroke();
-  }
-  // left toolbar column
-  ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=1;
-  for(let i=0;i<9;i++){ const ty=58+i*48; ctx.fillRect(14,ty,38,32); ctx.strokeRect(14,ty,38,32); }
-  // top title strip (ONE logo placement)
-  ctx.fillStyle='#10161c'; ctx.fillRect(0,0,w,44);
-  ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.beginPath(); ctx.moveTo(0,44); ctx.lineTo(w,44); ctx.stroke();
-  ctx.textBaseline='middle';
-  ctx.font='800 26px Montserrat, Arial';
-  ctx.fillStyle='#ffffff'; ctx.fillText('DRAF',64,22);
-  const dw=ctx.measureText('DRAF').width;
-  ctx.fillStyle='#19c8de'; ctx.fillText('TECH',64+dw,22);
-  const tw=ctx.measureText('TECH').width;
-  ctx.font='600 16px Montserrat, Arial'; ctx.fillStyle='rgba(255,255,255,0.5)';
-  ctx.fillText(' · AS-BUILT OSP-04',64+dw+tw+6,23);
-  // bottom command strip
-  ctx.fillStyle='#0d1218'; ctx.fillRect(0,h-36,w,36);
-  ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.beginPath(); ctx.moveTo(0,h-36); ctx.lineTo(w,h-36); ctx.stroke();
-  ctx.strokeStyle='rgba(150,220,235,0.4)'; ctx.lineWidth=2.2; ctx.lineCap='round';
-  let cx=70; for(let i=0;i<15;i++){ const sw2=(i%3===0)?20:9; ctx.beginPath(); ctx.moveTo(cx,h-18); ctx.lineTo(cx+sw2,h-18); ctx.stroke(); cx+=sw2+11; }
-},{clamp:true});
-
-const gisTex=ctex(1024,576,(ctx,w,h)=>{
-  ctx.fillStyle='#0a0f11'; ctx.fillRect(0,0,w,h);
-  ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1;
-  for(let x=0;x<w;x+=48){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
-  for(let y=0;y<h;y+=48){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
-  const parcels=[[0.06,0.12,0.30,0.26],[0.40,0.08,0.24,0.34],[0.10,0.52,0.34,0.32],[0.52,0.48,0.30,0.30],[0.68,0.10,0.26,0.28]];
-  for(const [x,y,pw,ph] of parcels){
-    ctx.fillStyle='rgba(255,255,255,0.045)'; ctx.fillRect(x*w,y*h,pw*w,ph*h);
-    ctx.strokeStyle='rgba(200,215,220,0.30)'; ctx.lineWidth=1.1; ctx.strokeRect(x*w,y*h,pw*w,ph*h);
-  }
-  const rp2=[[0.03,0.92],[0.22,0.80],[0.38,0.58],[0.55,0.50],[0.70,0.30],[0.95,0.08]].map(p=>[p[0]*w,p[1]*h]);
-  for(let pass=0;pass<2;pass++){
-    ctx.beginPath(); ctx.moveTo(rp2[0][0],rp2[0][1]);
-    for(let i=1;i<rp2.length;i++) ctx.lineTo(rp2[i][0],rp2[i][1]);
-    ctx.lineCap='round'; ctx.lineJoin='round';
-    ctx.lineWidth=pass===0?7:2.2;
-    ctx.strokeStyle=pass===0?'rgba(40,205,235,0.18)':'rgba(150,240,255,0.9)';
-    ctx.stroke();
-  }
-  // north arrow
-  const nx=w-56, ny=54;
-  ctx.strokeStyle='rgba(230,235,238,0.7)'; ctx.fillStyle='rgba(230,235,238,0.7)'; ctx.lineWidth=1.4;
-  ctx.beginPath(); ctx.moveTo(nx,ny+22); ctx.lineTo(nx,ny-18); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(nx,ny-22); ctx.lineTo(nx-8,ny-8); ctx.lineTo(nx+8,ny-8); ctx.closePath(); ctx.fill();
-  // scale bar dashes
-  ctx.strokeStyle='rgba(200,215,220,0.5)'; ctx.lineWidth=2;
-  let sx=24; for(let i=0;i<5;i++){ ctx.beginPath(); ctx.moveTo(sx,h-20); ctx.lineTo(sx+16,h-20); ctx.stroke(); sx+=24; }
-},{clamp:true});
-
-const kbTex=ctex(1024,360,(ctx,w,h)=>{
-  ctx.fillStyle='#15171b'; ctx.fillRect(0,0,w,h);
-  const cols=15, rows=4, mX=20, mY=16, cw=(w-mX*2)/cols, ch=(h-mY*2)/rows;
-  for(let r=0;r<rows;r++){
-    for(let c=0;c<cols;c++){
-      const x=mX+c*cw+2, y=mY+r*ch+2, kw=cw-4, kh=ch-4;
-      const grad=ctx.createLinearGradient(x,y,x,y+kh);
-      grad.addColorStop(0,'rgba(255,255,255,0.10)'); grad.addColorStop(0.5,'rgba(255,255,255,0.02)'); grad.addColorStop(1,'rgba(0,0,0,0.25)');
-      ctx.fillStyle='#1d2024'; ctx.fillRect(x,y,kw,kh);
-      ctx.fillStyle=grad; ctx.fillRect(x,y,kw,kh);
-      ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=1; ctx.strokeRect(x+0.5,y+0.5,kw-1,kh-1);
-    }
-  }
-  grain(ctx,w,h,900,0.03,0.08,0.5);
-},{clamp:true});
-
-// ================= MATERIALS (reuse shared MATP + shared textures) =================
-const darkTrimMat=new THREE.MeshStandardMaterial({color:0x101214,roughness:0.75,metalness:0.25});
-const deskMat=new THREE.MeshStandardMaterial({map:deskWoodTex,roughness:0.62,metalness:0.02});
-const floorMat=new THREE.MeshStandardMaterial({map:deskWoodTex,roughness:0.9,metalness:0.0,color:0x51504a});
-const plasticDark=new THREE.MeshStandardMaterial({color:0x131417,roughness:0.5,metalness:0.05});
-const penMat=new THREE.MeshStandardMaterial({color:0xff5a1e,roughness:0.4,metalness:0.1});
-const planClone=planTex.clone(); planClone.needsUpdate=true; planClone.repeat.set(0.55,0.42); planClone.offset.set(0.12,0.31);
-const planSheetMat=new THREE.MeshStandardMaterial({map:planClone,roughness:0.9,metalness:0.0});
-const rollMat=new THREE.MeshStandardMaterial({map:planTex,roughness:0.9,metalness:0.0});
-
-// ================= CANOPY (silhouette) =================
-const postGeo=new THREE.CylinderGeometry(0.035,0.04,2.4,16);
-const postXZ=[[-1.3,-0.9],[1.3,-0.9],[-1.3,0.9],[1.3,0.9]];
-for(const [px,pz] of postXZ){ const m=new THREE.Mesh(postGeo,darkTrimMat); m.position.set(px,1.2,pz); m.castShadow=true; g.add(m); }
-const roofMat=new THREE.MeshStandardMaterial({color:0x0c0d10,roughness:0.85,metalness:0.1,side:THREE.DoubleSide});
-const roof=new THREE.Mesh(new THREE.PlaneGeometry(3.4,2.6), roofMat);
-roof.rotation.x=Math.PI/2; roof.position.set(0,2.4,0); g.add(roof);
-
-// ================= FLOOR DECAL =================
-const floor=new THREE.Mesh(new THREE.PlaneGeometry(3.2,2.4), floorMat);
-floor.rotation.x=-Math.PI/2; floor.position.set(0,0.001,0); floor.receiveShadow=true; g.add(floor);
-
-// ================= DESK =================
-const deskTopY=0.75;
-const deskTop=new THREE.Mesh(new THREE.BoxGeometry(1.8,0.05,0.8), deskMat);
-deskTop.position.set(0,deskTopY-0.025,0); deskTop.castShadow=true; deskTop.receiveShadow=true; g.add(deskTop);
-// bevel trim strips
-const trimFB=new THREE.BoxGeometry(1.8,0.014,0.02), trimLR=new THREE.BoxGeometry(0.02,0.014,0.8);
-[[0,-0.4],[0,0.4]].forEach(([x,z])=>{ const m=new THREE.Mesh(trimFB,darkTrimMat); m.position.set(x,deskTopY+0.002,z); g.add(m); });
-[[-0.9,0],[0.9,0]].forEach(([x,z])=>{ const m=new THREE.Mesh(trimLR,darkTrimMat); m.position.set(x,deskTopY+0.002,z); g.add(m); });
-// steel legs
-const legGeo=new THREE.CylinderGeometry(0.022,0.026,0.72,16);
-[[-0.85,-0.35],[0.85,-0.35],[-0.85,0.35],[0.85,0.35]].forEach(([x,z])=>{ const m=new THREE.Mesh(legGeo,MATP.steel); m.position.set(x,0.36,z); m.castShadow=true; g.add(m); });
-
-// ================= MONITORS =================
-function makeMonitor(bw,bh,map,basic){
-  const grp=new THREE.Group();
-  const footT=0.018, stemH=0.24*(bw/0.62), bezelDepth=0.03, chamferDepth=0.01;
-  const foot=new THREE.Mesh(new THREE.BoxGeometry(bw*0.42,footT,bh*0.55), darkTrimMat);
-  foot.position.y=footT/2; foot.castShadow=true; grp.add(foot);
-  const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.02,stemH,16), MATP.steel);
-  stem.position.y=footT+stemH/2; stem.castShadow=true; grp.add(stem);
-  const centerY=footT+stemH+bh/2;
-  const bezel=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bezelDepth), darkTrimMat);
-  bezel.position.y=centerY; bezel.castShadow=true; grp.add(bezel);
-  const chamfer=new THREE.Mesh(new THREE.BoxGeometry(bw+0.022,bh+0.022,chamferDepth), MATP.steel);
-  chamfer.position.set(0,centerY,-bezelDepth/2-chamferDepth/2-0.0006); grp.add(chamfer);
-  const sw=bw*0.92, sh=bh*0.88;
-  const screenMat= basic? new THREE.MeshBasicMaterial({map}) : new THREE.MeshStandardMaterial({map,roughness:0.85});
-  const screen=new THREE.Mesh(new THREE.PlaneGeometry(sw,sh), screenMat);
-  screen.rotation.y=Math.PI;
-  const frontZ=-bezelDepth/2-chamferDepth-0.0025;
-  screen.position.set(0,centerY,frontZ); grp.add(screen);
-  // tiny status LED (permitted cyan tie-in)
-  const led=new THREE.Mesh(new THREE.SphereGeometry(0.0035,8,6), new THREE.MeshStandardMaterial({color:0x19c8de,emissive:0x19c8de,emissiveIntensity:1.6,roughness:0.4}));
-  led.position.set(bw*0.42,centerY-bh*0.44,frontZ+0.002); grp.add(led);
-  return {group:grp, screen, sw, sh, centerY, frontZ};
-}
-
-const mon1=makeMonitor(0.62,0.36,screenTex,true);
-mon1.group.position.set(-0.18,deskTopY,0.26);
-g.add(mon1.group);
-
-const mon2=makeMonitor(0.46,0.266,gisTex,true);
-mon2.group.position.set(0.46,deskTopY,0.20);
-mon2.group.rotation.y=DEG(25);
-g.add(mon2.group);
-
-// ================= DESK DRESSING =================
-// keyboard
-const kbGeo=new THREE.BoxGeometry(0.36,0.018,0.13);
-const kbMat=new THREE.MeshStandardMaterial({map:kbTex,roughness:0.6,metalness:0.05});
-const keyboard=new THREE.Mesh(kbGeo,kbMat);
-keyboard.position.set(-0.10,deskTopY+0.009,-0.18); keyboard.castShadow=true; keyboard.receiveShadow=true; g.add(keyboard);
-// plan sheet under corner of keyboard
-const planSheet=new THREE.Mesh(new THREE.PlaneGeometry(0.30,0.22), planSheetMat);
-planSheet.rotation.x=-Math.PI/2; planSheet.rotation.z=DEG(8);
-planSheet.position.set(-0.20,deskTopY+0.0015,-0.10); planSheet.receiveShadow=true; g.add(planSheet);
-// mouse
-const mouse=new THREE.Mesh(new THREE.SphereGeometry(0.03,14,10), plasticDark);
-mouse.scale.set(1.0,0.55,1.5);
-mouse.position.set(0.14,deskTopY+0.018,-0.18); mouse.castShadow=true; g.add(mouse);
-// mug
-const mugGrp=new THREE.Group();
-const mugBody=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.032,0.09,16), MATP.ceramic);
-mugBody.position.y=0.045; mugBody.castShadow=true; mugGrp.add(mugBody);
-const mugHandle=new THREE.Mesh(new THREE.TorusGeometry(0.022,0.006,8,16,Math.PI*1.3), MATP.ceramic);
-mugHandle.rotation.z=Math.PI/2; mugHandle.position.set(0.036,0.045,0); mugGrp.add(mugHandle);
-mugGrp.position.set(0.32,deskTopY,-0.24); g.add(mugGrp);
-// rolled print
-const roll=new THREE.Mesh(new THREE.CylinderGeometry(0.028,0.028,0.30,16), rollMat);
-roll.rotation.z=Math.PI/2; roll.position.set(0.62,deskTopY+0.028,-0.05); roll.castShadow=true; g.add(roll);
-// redline pen
-const pen=new THREE.Mesh(new THREE.CylinderGeometry(0.006,0.006,0.15,16), penMat);
-pen.rotation.z=Math.PI/2.3; pen.position.set(0.14,deskTopY+0.012,-0.30); pen.castShadow=true; g.add(pen);
-
-// ================= ARTICULATED DESK LAMP =================
-const lampGrp=new THREE.Group(); lampGrp.position.set(0.70,deskTopY,-0.30); g.add(lampGrp);
-const lampBase=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.055,0.016,16), darkTrimMat);
-lampBase.position.y=0.008; lampBase.castShadow=true; lampGrp.add(lampBase);
-const lowerArm=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.013,0.18,16), MATP.steel);
-lowerArm.position.set(-0.01,0.10,0.01); lowerArm.rotation.z=DEG(18); lowerArm.rotation.x=DEG(-8); lowerArm.castShadow=true; lampGrp.add(lowerArm);
-const joint=new THREE.Mesh(new THREE.SphereGeometry(0.02,12,10), darkTrimMat);
-joint.position.set(-0.04,0.185,0.03); lampGrp.add(joint);
-const upperArm=new THREE.Mesh(new THREE.CylinderGeometry(0.010,0.012,0.24,16), MATP.steel);
-upperArm.position.set(-0.16,0.27,0.10); upperArm.rotation.z=DEG(-58); upperArm.rotation.x=DEG(20); upperArm.castShadow=true; lampGrp.add(upperArm);
-const head=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.07,16,1,true), darkTrimMat);
-head.position.set(-0.30,0.33,0.24); head.rotation.x=Math.PI; head.castShadow=true; lampGrp.add(head);
-const bulb=new THREE.Mesh(new THREE.SphereGeometry(0.014,10,8), new THREE.MeshStandardMaterial({color:0xffcf9a,emissive:0xffb763,emissiveIntensity:1.2,roughness:0.4}));
-bulb.position.set(-0.30,0.305,0.24); lampGrp.add(bulb);
-
-const lampTarget=new THREE.Object3D(); lampTarget.position.set(-0.05,-0.015,0.16); lampGrp.add(lampTarget);
-const lampSpot=addPractical(new THREE.SpotLight(0xffbe78,3.0,1.7,DEG(42),0.55));
-lampSpot.position.copy(bulb.position); lampSpot.target=lampTarget; lampSpot.castShadow=false;
-lampGrp.add(lampSpot);
-
-// ================= MONITOR SPILL LIGHT =================
-const spill=addPractical(new THREE.PointLight(0xcfe8f2,2.2,3));
-spill.position.set(-0.16,mon1.centerY+deskTopY-0.02,0.10);
-g.add(spill);
-
-// ================= CURSOR TRACER =================
-const tracerMat=new THREE.MeshBasicMaterial({color:0x8ff2ff,transparent:true,opacity:0.9});
-const tracer=new THREE.Mesh(new THREE.PlaneGeometry(0.006,0.006), tracerMat);
-tracer.rotation.y=Math.PI;
-mon1.group.add(tracer);
-
-// ================= STEAM SPRITES (optional, cyclical) =================
-const steamMat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.0,blending:THREE.AdditiveBlending,depthWrite:false});
-const steamSprites=[];
-for(let i=0;i<4;i++){
-  const sp=new THREE.Mesh(new THREE.PlaneGeometry(0.02,0.02), steamMat.clone());
-  sp.position.set(mugGrp.position.x, deskTopY+0.10, mugGrp.position.z);
-  g.add(sp); steamSprites.push({mesh:sp, phase:i/4});
-}
-
-// ================= CAMERA =================
-const camPos=new THREE.Vector3().copy(P).addScaledVector(SD,-3.6).addScaledVector(TN,-4.2); camPos.y=1.55;
-g.updateMatrixWorld(true);
-const monWorld=new THREE.Vector3(); mon1.screen.getWorldPosition(monWorld);
-const lookAt=new THREE.Vector3(monWorld.x,1.05,monWorld.z);
-
-// ================= LOOP =================
-const N=ROUTE_PTS.length;
-SCENES.cad={group:g, camPos, lookAt, update:(time,act)=>{
-  const s=((time/6)%1+1)%1;
-  const f=s*(N-1); const i0=Math.floor(f); const i1=Math.min(i0+1,N-1); const fr=f-i0;
-  const p0=ROUTE_PTS[i0], p1=ROUTE_PTS[i1];
-  const u=p0[0]+(p1[0]-p0[0])*fr, v=p0[1]+(p1[1]-p0[1])*fr;
-  tracer.position.set(-mon1.sw/2+u*mon1.sw, mon1.centerY+mon1.sh/2-v*mon1.sh, mon1.frontZ-0.0015);
-  tracerMat.opacity=0.55+0.4*Math.sin(time*20)*(0.6+0.4*act);
-
-  spill.intensity=7.5*(1+0.05*Math.sin(time*11));
-  lampSpot.intensity=8.5*(0.92+0.08*Math.sin(time*0.7))*(0.85+0.15*act);
-
-  for(const st of steamSprites){
-    const lt=((time*0.14)+st.phase)%1;
-    st.mesh.position.y=deskTopY+0.10+lt*0.22;
-    st.mesh.position.x=mugGrp.position.x+Math.sin(lt*Math.PI*2+st.phase*6)*0.006;
-    st.mesh.material.opacity=Math.sin(lt*Math.PI)*0.22;
-  }
-}};
-}
-
-
-{ /* ---- SCENE: wifi ---- */
-const S = STOPS.find(s=>s.key==='wifi');
-const t = S.t, P = rp(t), SD = sideOf(t), TN = rt(t);
-const OFF = 2.7;
-
-const g = new THREE.Group();
-g.position.set(P.x + SD.x*OFF, 0, P.z + SD.z*OFF);
-g.lookAt(P.x, 0, P.z);
-scene.add(g);
-
-// ---- constants ----
-const POLE_HT = 9.5, POLE_BASE_R = 0.42, POLE_TOP_R = 0.20;
-const HEAD_Y = 8.6, DISH_Y = 7.2;
-const AZI_LADDER = -Math.PI/2;       // cable ladder + riser (camera/road-facing side)
-const AZI_MAINT  = Math.PI;          // maintenance ladder (back side)
-const AZI_CAB    = -2.35;            // equipment cabinet
-const AZI_DISH   = Math.PI/6;        // microwave dish
-const SECTOR_AZI = [Math.PI/2, Math.PI*7/6, Math.PI*11/6];
-
-function poleRadiusAt(y){
-  const f = THREE.MathUtils.clamp(y/POLE_HT,0,1);
-  return THREE.MathUtils.lerp(POLE_BASE_R,POLE_TOP_R,f);
-}
-
-// ---- textures / materials (new ctex: 2 total) ----
-const radomeTex = ctex(256,512,(ctx,w,h)=>{
-  ctx.fillStyle='#e8e6e1'; ctx.fillRect(0,0,w,h);
-  ctx.strokeStyle='rgba(108,106,100,0.30)'; ctx.lineWidth=2;
-  for(let i=1;i<4;i++){ const x=Math.round(w*i/4)+0.5; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
-  grain(ctx,w,h,3200,0.02,0.05,0.5);
-  blotch(ctx,w,h,10,'rgba(150,148,140,$)',0.03,0.08,30,80);
-},{});
-
-const logoTex = ctex(512,160,(ctx,w,h)=>{
-  ctx.fillStyle='#14171a'; ctx.fillRect(0,0,w,h);
-  ctx.textBaseline='middle'; ctx.textAlign='left';
-  ctx.font='800 84px Montserrat, Arial';
-  const s1='DRAF', s2='TECH';
-  const w1=ctx.measureText(s1).width, w2=ctx.measureText(s2).width;
-  const startX = w/2-(w1+w2)/2, cy=h/2+4;
-  ctx.fillStyle='#ffffff'; ctx.fillText(s1,startX,cy);
-  ctx.fillStyle='#19c8de'; ctx.fillText(s2,startX+w1,cy);
-},{clamp:true});
-
-const radomeMat = new THREE.MeshStandardMaterial({map:radomeTex,color:0xffffff,roughness:0.5,metalness:0.03,emissive:0xffffff,emissiveIntensity:0.02});
-const dishMat = new THREE.MeshStandardMaterial({map:radomeTex,color:0xb7bbbc,roughness:0.62,metalness:0.05});
-const darkRubber = new THREE.MeshStandardMaterial({color:0x141414,roughness:0.85,metalness:0.05});
-const cyanEmissive = new THREE.MeshStandardMaterial({color:0x062226,emissive:0x19c8de,emissiveIntensity:1.0,roughness:0.4,metalness:0.0,transparent:true,opacity:0.95});
-const pulseMat = new THREE.MeshStandardMaterial({color:0x0d3a40,emissive:0x5df1ff,emissiveIntensity:1.6,roughness:0.3,metalness:0.0,transparent:true,opacity:1});
-const beaconMat = new THREE.MeshStandardMaterial({color:0x3a0d0d,emissive:0xff2200,emissiveIntensity:0.4,roughness:0.4,metalness:0.1});
-const ledWarmMat = new THREE.MeshStandardMaterial({color:0xffdca0,emissive:0xffb763,emissiveIntensity:1.0,roughness:0.5});
-const logoMat = new THREE.MeshStandardMaterial({map:logoTex,roughness:0.55,metalness:0.05,emissive:0xffffff,emissiveIntensity:0.03});
-const bollardMat = new THREE.MeshStandardMaterial({color:0xffb400,roughness:0.5,metalness:0.15});
-const padMat = new THREE.MeshStandardMaterial({map:curbTex,roughness:0.95});
-const gravelMat = new THREE.MeshStandardMaterial({map:gravelTex,roughness:1.0});
-
-// ---- helpers ----
-function strut(p0,p1,w,h,mat){
-  const dir = new THREE.Vector3().subVectors(p1,p0);
-  const len = dir.length(); dir.normalize();
-  const geo = new THREE.BoxGeometry(w,h,Math.max(len,0.01));
-  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),dir);
-  const mesh = new THREE.Mesh(geo,mat);
-  mesh.quaternion.copy(q);
-  mesh.position.set((p0.x+p1.x)/2,(p0.y+p1.y)/2,(p0.z+p1.z)/2);
-  mesh.castShadow = true;
-  return mesh;
-}
-
-function finnedRRUGeo(w,h,d,finN){
-  const geos = [new THREE.BoxGeometry(w,h,d)];
-  const finGap = h/(finN+1);
-  for(let i=0;i<finN;i++){
-    const fg = new THREE.BoxGeometry(w*0.9,0.025,0.03);
-    fg.translate(0, -h/2+finGap*(i+1), d/2+0.015);
-    geos.push(fg);
-  }
-  for(let i=0;i<2;i++){
-    const bg = new THREE.CylinderGeometry(0.018,0.018,0.05,16);
-    bg.translate((i-0.5)*w*0.5, -h/2-0.025, 0);
-    geos.push(bg);
-  }
-  return BGU.mergeGeometries(geos);
-}
-
-function buildLadderMesh(azi, y0, y1, standoffFn, railGap, rungStep, railR, rungR, mat){
-  const geos = [];
-  const rad = new THREE.Vector3(Math.cos(azi),0,Math.sin(azi));
-  const tan = new THREE.Vector3(-Math.sin(azi),0,Math.cos(azi));
-  const rMid = standoffFn((y0+y1)/2);
-  for(const ro of [-railGap/2, railGap/2]){
-    const railGeo = new THREE.CylinderGeometry(railR,railR,y1-y0,16);
-    railGeo.translate(rad.x*rMid+tan.x*ro,(y0+y1)/2,rad.z*rMid+tan.z*ro);
-    geos.push(railGeo);
-  }
-  const steps = Math.max(2,Math.round((y1-y0)/rungStep));
-  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),tan);
-  for(let i=0;i<=steps;i++){
-    const y = y0+(y1-y0)*i/steps;
-    const r = standoffFn(y);
-    const rungGeo = new THREE.CylinderGeometry(rungR,rungR,railGap+0.04,16);
-    rungGeo.applyQuaternion(q);
-    rungGeo.translate(rad.x*r,y,rad.z*r);
-    geos.push(rungGeo);
-  }
-  const mesh = new THREE.Mesh(BGU.mergeGeometries(geos),mat);
-  mesh.castShadow = true;
-  return mesh;
-}
-
-// ---- 1) MONOPOLE ----
-const poleGeo = new THREE.CylinderGeometry(POLE_TOP_R,POLE_BASE_R,POLE_HT,24,1,false);
-const poleMesh = new THREE.Mesh(poleGeo, MATP.steel);
-poleMesh.position.y = POLE_HT/2;
-poleMesh.castShadow = true; poleMesh.receiveShadow = true;
-g.add(poleMesh);
-
-for(let i=0;i<4;i++){
-  const ang = i*Math.PI/2 + Math.PI/8;
-  const rAvg = poleRadiusAt(POLE_HT*0.4)+0.006;
-  const h = POLE_HT*0.9;
-  const seamGeo = new THREE.BoxGeometry(0.03,h,0.012);
-  const seam = new THREE.Mesh(seamGeo, MATP.dark);
-  seam.position.set(Math.cos(ang)*rAvg, h/2+0.2, Math.sin(ang)*rAvg);
-  seam.rotation.y = Math.PI/2-ang;
-  seam.castShadow = true;
-  g.add(seam);
-}
-
-const flangeGeo = new THREE.CylinderGeometry(0.62,0.66,0.14,24);
-const flange = new THREE.Mesh(flangeGeo, MATP.steel);
-flange.position.y = 0.07;
-flange.castShadow = true; flange.receiveShadow = true;
-g.add(flange);
-
-for(let i=0;i<8;i++){
-  const a = i*Math.PI/4;
-  const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.22,16), MATP.dark);
-  bolt.position.set(Math.cos(a)*0.58,0.2,Math.sin(a)*0.58);
-  bolt.castShadow = true; g.add(bolt);
-  const nut = new THREE.Mesh(new THREE.TorusGeometry(0.028,0.012,8,16), MATP.dark);
-  nut.position.set(Math.cos(a)*0.58,0.3,Math.sin(a)*0.58);
-  nut.rotation.x = Math.PI/2;
-  g.add(nut);
-}
-
-// maintenance ladder (lower 3m)
-const maintLadder = buildLadderMesh(AZI_MAINT, 0.15, 3.0, y=>poleRadiusAt(y)+0.18, 0.32, 0.32, 0.016, 0.014, MATP.steel);
-g.add(maintLadder);
-
-// cable ladder (base equipment to head, carries trunk + riser)
-const standoffFn = y=>poleRadiusAt(y)+0.08;
-const cableLadder = buildLadderMesh(AZI_LADDER, 0.8, HEAD_Y-0.15, standoffFn, 0.22, 0.45, 0.014, 0.012, MATP.steel);
-g.add(cableLadder);
-
-// black hybrid trunk cable riding inside the cable ladder
-{
-  const pts = [];
-  for(let i=0;i<=6;i++){
-    const y = 0.85+(HEAD_Y-0.3-0.85)*i/6;
-    const r = poleRadiusAt(y)+0.08;
-    pts.push(new THREE.Vector3(Math.cos(AZI_LADDER)*r,y,Math.sin(AZI_LADDER)*r));
-  }
-  const trunkCurve = new THREE.CatmullRomCurve3(pts);
-  const trunkGeo = new THREE.TubeGeometry(trunkCurve,40,0.024,8,false);
-  const trunk = new THREE.Mesh(trunkGeo, darkRubber);
-  g.add(trunk);
-}
-
-// ---- riser curve (route tie-in, second segment) + steady tube ----
-const riserPts = [];
-const RY0 = 0.85, RY1 = HEAD_Y-0.2;
-for(let i=0;i<=6;i++){
-  const y = RY0+(RY1-RY0)*i/6;
-  const r = poleRadiusAt(y)+0.08;
-  riserPts.push(new THREE.Vector3(Math.cos(AZI_LADDER)*r,y,Math.sin(AZI_LADDER)*r));
-}
-const riserCurve = new THREE.CatmullRomCurve3(riserPts);
-const riserTube = new THREE.Mesh(new THREE.TubeGeometry(riserCurve,48,0.014,8,false), cyanEmissive);
-g.add(riserTube);
-
-// ---- 2) HEAD-FRAME ----
-function corner(azi){ return new THREE.Vector3(Math.cos(azi)*1.05, HEAD_Y, Math.sin(azi)*1.05); }
-for(let i=0;i<3;i++){
-  const c0 = corner(SECTOR_AZI[i]), c1 = corner(SECTOR_AZI[(i+1)%3]);
-  const len = c0.distanceTo(c1);
-  const ang = Math.atan2(c1.z-c0.z, c1.x-c0.x);
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(len,0.14,0.14), MATP.steel);
-  beam.position.set((c0.x+c1.x)/2,HEAD_Y,(c0.z+c1.z)/2);
-  beam.rotation.y = -ang;
-  beam.castShadow = true;
-  g.add(beam);
-}
-const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.1,20), MATP.steel);
-hub.position.y = HEAD_Y;
-hub.castShadow = true;
-g.add(hub);
-
-// ---- SECTORS ----
-for(const azi of SECTOR_AZI){
-  const rad = new THREE.Vector3(Math.cos(azi),0,Math.sin(azi));
-  const grp = new THREE.Group();
-  const mountR = poleRadiusAt(HEAD_Y)+0.05;
-  grp.position.set(rad.x*mountR, HEAD_Y+0.15, rad.z*mountR);
-  grp.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1), rad);
-  g.add(grp);
-
-  const standoff = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.85,16), MATP.steel);
-  standoff.rotation.x = Math.PI/2;
-  standoff.position.z = 0.55;
-  standoff.castShadow = true;
-  grp.add(standoff);
-
-  const panel = new THREE.Mesh(new THREE.BoxGeometry(0.32,1.3,0.12), radomeMat);
-  panel.position.set(0,0.05,1.55);
-  panel.rotation.x = THREE.MathUtils.degToRad(4);
-  panel.castShadow = true;
-  grp.add(panel);
-
-  const rru1 = new THREE.Mesh(finnedRRUGeo(0.42,0.5,0.2,5), MATP.dark);
-  rru1.position.set(0.17,-0.15,0.5);
-  rru1.castShadow = true;
-  grp.add(rru1);
-  const led1 = new THREE.Mesh(new THREE.SphereGeometry(0.01,8,6), ledWarmMat);
-  led1.position.set(0.12,0.05,0.11);
-  rru1.add(led1);
-  const led2 = led1.clone(); led2.position.x = -0.12; rru1.add(led2);
-
-  const rru2 = new THREE.Mesh(finnedRRUGeo(0.32,0.4,0.16,3), MATP.dark);
-  rru2.position.set(-0.16,-0.22,0.42);
-  rru2.castShadow = true;
-  grp.add(rru2);
-
-  const jStart = new THREE.Vector3(0.17,0.1,0.62);
-  const jEnd = new THREE.Vector3(0,-0.5,1.49);
-  const jMid = new THREE.Vector3((jStart.x+jEnd.x)/2, Math.max(jStart.y,jEnd.y)+0.06, (jStart.z+jEnd.z)/2);
-  const jCurve = new THREE.CatmullRomCurve3([jStart,jMid,jEnd]);
-  const jumper = new THREE.Mesh(new THREE.TubeGeometry(jCurve,12,0.012,6,false), darkRubber);
-  grp.add(jumper);
-}
-
-// ---- 3) MICROWAVE BACKHAUL DISH ----
-{
-  const radD = new THREE.Vector3(Math.cos(AZI_DISH),0,Math.sin(AZI_DISH));
-  const dishGrp = new THREE.Group();
-  const mountRD = poleRadiusAt(DISH_Y)+0.04;
-  dishGrp.position.set(radD.x*mountRD, DISH_Y, radD.z*mountRD);
-  dishGrp.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1), radD);
-  g.add(dishGrp);
-
-  const dStandoff = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.55,16), MATP.steel);
-  dStandoff.rotation.x = Math.PI/2;
-  dStandoff.position.z = 0.28;
-  dStandoff.castShadow = true;
-  dishGrp.add(dStandoff);
-
-  const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,0.22,24), dishMat);
-  drum.rotation.x = Math.PI/2;
-  drum.position.z = 0.66;
-  drum.castShadow = true;
-  dishGrp.add(drum);
-
-  const shroud = new THREE.Mesh(new THREE.TorusGeometry(0.36,0.03,10,24), MATP.steel);
-  shroud.position.z = drum.position.z;
-  dishGrp.add(shroud);
-
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.33,16,10,0,Math.PI*2,0,Math.PI/2), dishMat);
-  cap.rotation.x = Math.PI/2;
-  cap.position.z = drum.position.z+0.11;
-  cap.castShadow = true;
-  dishGrp.add(cap);
-}
-
-// ---- 4) TOP: lightning rod + obstruction beacon ----
-const beaconBody = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.12,0.16,16), MATP.dark);
-beaconBody.position.y = POLE_HT+0.08;
-beaconBody.castShadow = true;
-g.add(beaconBody);
-
-const beaconDome = new THREE.Mesh(new THREE.SphereGeometry(0.095,16,10,0,Math.PI*2,0,Math.PI/2), beaconMat);
-beaconDome.position.y = POLE_HT+0.16;
-beaconDome.castShadow = true;
-g.add(beaconDome);
-
-const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.004,0.018,0.55,16), MATP.dark);
-rod.position.y = POLE_HT+0.535;
-rod.castShadow = true;
-g.add(rod);
-
-// ---- 5/6) BASE CABINET, ICE BRIDGE, ROUTE TIE-IN BRANCH ----
-const CAB_R = poleRadiusAt(0)+1.1;
-const cabCenter = new THREE.Vector3(Math.cos(AZI_CAB)*CAB_R, 0, Math.sin(AZI_CAB)*CAB_R);
-const CAB_W=0.55, CAB_H=1.05, CAB_D=0.42;
-
-const cabinet = new THREE.Mesh(new THREE.BoxGeometry(CAB_W,CAB_H,CAB_D), MATP.dark);
-cabinet.position.set(cabCenter.x,CAB_H/2,cabCenter.z);
-cabinet.rotation.y = Math.PI;
-cabinet.castShadow = true; cabinet.receiveShadow = true;
-g.add(cabinet);
-
-const logoPlane = new THREE.Mesh(new THREE.PlaneGeometry(0.24,0.075), logoMat);
-logoPlane.position.set(0,0.12,CAB_D/2+0.004);
-cabinet.add(logoPlane);
-
-const r95 = poleRadiusAt(0.95)+0.08;
-const iceP0 = new THREE.Vector3(cabCenter.x*0.85, 0.95, cabCenter.z*0.85);
-const iceP1 = new THREE.Vector3(Math.cos(AZI_LADDER)*r95, 0.95, Math.sin(AZI_LADDER)*r95);
-g.add(strut(iceP0, iceP1, 0.24, 0.06, MATP.steel));
-
-// branch: main line at ground -> base cabinet
-const branchStart = new THREE.Vector3(0,0.045,-OFF);
-const branchEnd = new THREE.Vector3(cabCenter.x,0.12,cabCenter.z);
-const branchMid = new THREE.Vector3((branchStart.x+branchEnd.x)/2,0.22,(branchStart.z+branchEnd.z)/2);
-const branchCurve = new THREE.CatmullRomCurve3([branchStart,branchMid,branchEnd]);
-const branchTube = new THREE.Mesh(new THREE.TubeGeometry(branchCurve,24,0.014,8,false), cyanEmissive);
-g.add(branchTube);
-
-const pulse = new THREE.Mesh(new THREE.SphereGeometry(0.05,12,10), pulseMat);
-g.add(pulse);
-
-// ---- 7) GROUND: pad, gravel ring, bollards ----
-const pad = new THREE.Mesh(new THREE.PlaneGeometry(1.9,1.5), padMat);
-pad.rotation.x = -Math.PI/2;
-pad.position.set(cabCenter.x,0.01,cabCenter.z);
-pad.receiveShadow = true;
-g.add(pad);
-
-const gravel = new THREE.Mesh(new THREE.RingGeometry(0.75,2.1,48), gravelMat);
-gravel.rotation.x = -Math.PI/2;
-gravel.position.y = 0.006;
-gravel.receiveShadow = true;
-g.add(gravel);
-
-{
-  const tanC = new THREE.Vector3(-Math.sin(AZI_CAB),0,Math.cos(AZI_CAB));
-  for(const s of [-1,1]){
-    const bx = cabCenter.x + tanC.x*0.5*s + Math.cos(AZI_CAB)*0.55;
-    const bz = cabCenter.z + tanC.z*0.5*s + Math.sin(AZI_CAB)*0.55;
-    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.065,0.85,16), bollardMat);
-    b.position.set(bx,0.425,bz);
-    b.castShadow = true; b.receiveShadow = true;
-    g.add(b);
-  }
-}
-
-// ---- practical light ----
-const practicalLight = addPractical(new THREE.PointLight(0xffb763,1.0,6,2));
-practicalLight.position.set(cabCenter.x,1.3,cabCenter.z);
-
-// ---- camera override ----
-const camPos = new THREE.Vector3().copy(P).addScaledVector(SD,-5.6).addScaledVector(TN,-7.5);
-camPos.y = 3.1;
-const lookAt = new THREE.Vector3(g.position.x, 4.6, g.position.z);
-
-const update = (time,act)=>{
-  const bp = 0.5+0.5*Math.sin(time*(2*Math.PI/1.4));
-  beaconMat.emissiveIntensity = 0.25+0.85*bp*bp;
-  radomeMat.emissiveIntensity = 0.02+0.02*Math.sin(time*0.7);
-
-  const u = (time/2.8)%1;
-  pulse.position.copy(riserCurve.getPointAt(u));
-  const fade = smoothstepJS(0,0.08,u)*(1-smoothstepJS(0.9,1,u));
-  pulseMat.opacity = Math.max(0.05,fade);
-  pulseMat.emissiveIntensity = (1.2+0.6*act)*fade+0.2;
-
-  practicalLight.intensity = 1.0+0.12*act*Math.sin(time*0.9);
-};
-
-SCENES.wifi = { group:g, camPos, lookAt, update };
-}
-
-
-{ /* ---- SCENE: permit ---- */
-const S = STOPS.find(s=>s.key==='permit'); const t=S.t, P=rp(t), SD=sideOf(t), TN=rt(t);
-const g = new THREE.Group();
-g.position.set(P.x+SD.x*2.6, 0, P.z+SD.z*2.6);
-g.lookAt(P.x,0,P.z);
-scene.add(g);
-
-// ================= helpers =================
-function atlasUV(tex, rx,ry,rw,rh, W,H){
-  const c=tex.clone();
-  c.offset.set(rx/W, 1-(ry+rh)/H);
-  c.repeat.set(rw/W, rh/H);
-  c.wrapS=THREE.ClampToEdge; c.wrapT=THREE.ClampToEdge;
-  c.needsUpdate=true;
-  return c;
-}
-
-// ================= textures (4 total) =================
-const paintTex = ctex(1024,1024,(ctx,w,h)=>{
-  const gr=ctx.createLinearGradient(0,0,0,h);
-  gr.addColorStop(0,'#f5f5f2'); gr.addColorStop(0.55,'#eeeeeb'); gr.addColorStop(1,'#e2e0d8');
-  ctx.fillStyle=gr; ctx.fillRect(0,0,w,h);
-  grain(ctx,w,h,3200,0.02,0.05,0.35);
-  const band=ctx.createLinearGradient(0,h*0.76,0,h);
-  band.addColorStop(0,'rgba(95,88,72,0)'); band.addColorStop(1,'rgba(70,64,52,0.32)');
-  ctx.fillStyle=band; ctx.fillRect(0,h*0.76,w,h*0.24);
-  blotch(ctx,w,h,18,'rgba(100,92,74,$)',0.04,0.12,26,80);
-  ctx.strokeStyle='rgba(35,35,32,0.28)'; ctx.lineWidth=3;
-  for(let i=1;i<5;i++){ const x=i*w/5; ctx.beginPath(); ctx.moveTo(x,h*0.14); ctx.lineTo(x,h*0.94); ctx.stroke(); }
+/* ---------- 0 · OPENER: holographic plan panel over the origin ---------- */
+place('open', (g)=>{
+  const panel=new THREE.Group(); panel.position.set(0,EMY,0); panel.rotation.x=-0.12; g.add(panel);
+  panel.add(fillPanel(5.0,3.2,0.12));
+  panel.add(poly(rectXY(5.0,3.2), LM(CY,2.4)));
+  panel.add(poly(rectXY(4.6,2.8), LM(CY_MID,1.2,0.6)));
+  /* faint inner grid + parcels */
+  for(let i=-1;i<=1;i++){ panel.add(poly([V(i*1.3,-1.3),V(i*1.3,1.3)], LM(DIMC,1,0.4)));
+    panel.add(poly([V(-2.2,i*0.85),V(2.2,i*0.85)], LM(DIMC,1,0.4))); }
+  panel.add(poly(rectXY(0.9,0.5,-1.7,-1.0), LM(CY_MID,1,0.7)));
+  panel.add(poly(rectXY(0.7,0.6, 0.9, 0.6), LM(CY_MID,1,0.7)));
+  /* the drawn route across the sheet */
+  const rp2=[V(-2.1,0.9),V(-1.1,0.5),V(-0.2,0.7),V(0.5,-0.1),V(1.2,-0.5),V(2.0,-0.4)];
+  const rl=poly(rp2, LM(CY_HOT,3)); panel.add(rl);
+  for(const p of rp2){ const d=dot(0.5,CY); d.position.copy(p); d.position.z=0.02; panel.add(d); }
+  /* title block */
+  panel.add(poly(rectXY(1.4,0.55,1.5,-1.15), LM(CY,1.4)));
+  const pen=dot(1.1,CY_HOT); panel.add(pen);
+  return {update:(tm)=>{ const u=(tm*0.12)%1; const idx=u*(rp2.length-1); const k=Math.floor(idx), fr=idx-k;
+    const a=rp2[k], b=rp2[Math.min(rp2.length-1,k+1)];
+    pen.position.set(a.x+(b.x-a.x)*fr, a.y+(b.y-a.y)*fr, 0.03); }};
 });
 
-const plasticAtlas = ctex(1024,1024,(ctx,w,h)=>{
-  ctx.fillStyle='#17171a'; ctx.fillRect(0,0,w,512);
-  ctx.fillStyle='rgba(72,72,76,0.28)';
-  for(let y=14;y<500;y+=16){ ctx.fillRect(0,y,w,5); }
-  ctx.fillStyle='#aeb0b2'; ctx.fillRect(0,512,w,512);
-  ctx.strokeStyle='rgba(60,58,55,0.3)'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.moveTo(0,768); ctx.lineTo(w,768); ctx.stroke();
-  blotch(ctx,w,h,26,'rgba(55,52,48,$)',0.05,0.14,20,66);
-  grain(ctx,w,h,3800,0.015,0.045,0.3);
+/* ---------- 1 · SURVEY: topographic contours + reticle ---------- */
+place('survey', (g)=>{
+  const e=new THREE.Group(); e.position.set(0,EMY,0); g.add(e);
+  /* stacked irregular contour loops (a hill in plan) */
+  for(let i=0;i<6;i++){ const r=0.5+i*0.42, seg=64, pts=[];
+    for(let j=0;j<=seg;j++){ const a=j/seg*TAU; const wob=1+0.12*Math.sin(a*3+i)+0.08*Math.cos(a*5-i);
+      pts.push(V(Math.cos(a)*r*wob*1.15-0.1*i, Math.sin(a)*r*wob-0.05*i)); }
+    e.add(poly(pts, LM(i<2?CY_HOT:CY_MID, i<2?2:1.3, 0.85-i*0.08))); }
+  /* benchmark nodes with tick crosses */
+  const bm=[V(1.6,1.1),V(-1.9,-0.7),V(0.4,-1.7)];
+  for(const p of bm){ const d=dot(0.7,CY_HOT); d.position.copy(p); e.add(d);
+    e.add(poly([V(p.x-0.28,p.y),V(p.x+0.28,p.y)], LM(CY,1.3)));
+    e.add(poly([V(p.x,p.y-0.28),V(p.x,p.y+0.28)], LM(CY,1.3))); }
+  /* reticle */
+  const ret=new THREE.Group(); ret.position.set(0,0,0.04); e.add(ret);
+  ret.add(poly(circleXY(2.15,80), LM(CY,1.6,0.7)));
+  for(let i=0;i<24;i++){ const a=i/24*TAU; ret.add(poly([V(Math.cos(a)*2.05,Math.sin(a)*2.05),V(Math.cos(a)*(i%6?2.18:2.32),Math.sin(a)*(i%6?2.18:2.32))],LM(CY,1)));}
+  const cross=new THREE.Group(); e.add(cross);
+  cross.add(poly([V(-0.5,0),V(0.5,0)],LM(CY_HOT,1.6))); cross.add(poly([V(0,-0.5),V(0,0.5)],LM(CY_HOT,1.6)));
+  const scanned=dot(0.9,AMBER); e.add(scanned);
+  return {update:(tm)=>{ ret.rotation.z=tm*0.25; const u=(tm*0.4)%1, a=u*TAU;
+    scanned.position.set(Math.cos(a)*1.4,Math.sin(a)*1.4,0.05); scanned.material.opacity=0.5+0.5*Math.sin(tm*4); }};
 });
 
-const decalRect={x:736,y:812,w:256,h:150};
-const paperTex = ctex(1024,1024,(ctx,w,h)=>{
-  ctx.fillStyle='#ece7d9'; ctx.fillRect(0,0,w,h);
-  grain(ctx,w,h,2400,0.012,0.035,0.2);
-  ctx.fillStyle='#3a4557'; ctx.fillRect(0,0,w,h*0.12);
-  ctx.fillStyle='#f2f2f0'; ctx.font='800 56px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('PERMIT', w*0.5, h*0.06);
-  const cx=w*0.27, cy=h*0.46;
-  ctx.strokeStyle='rgba(95,95,95,0.5)'; ctx.lineWidth=10;
-  ctx.beginPath(); ctx.arc(cx,cy,88,0,Math.PI*2); ctx.stroke();
-  ctx.strokeStyle='rgba(170,170,170,0.35)'; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.arc(cx,cy,74,0,Math.PI*2); ctx.stroke();
-  ctx.strokeStyle='rgba(150,45,45,0.42)'; ctx.lineWidth=6;
-  ctx.beginPath(); ctx.arc(cx,cy,68,0.3,2.5); ctx.stroke();
-  for(let i=0;i<9;i++){
-    const yy=h*0.22+i*h*0.058;
-    ctx.fillStyle='rgba(95,92,95,0.32)';
-    const bw=w*(0.32+0.22*((i*37)%10)/10);
-    ctx.fillRect(w*0.5,yy,bw,10);
-  }
-  ctx.strokeStyle='rgba(70,70,70,0.55)'; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.moveTo(w*0.08,h*0.855); ctx.lineTo(w*0.44,h*0.855); ctx.stroke();
-  ctx.fillStyle='#0d1420'; ctx.fillRect(decalRect.x,decalRect.y,decalRect.w,decalRect.h);
-  ctx.fillStyle='#f2f2f0'; ctx.font='800 52px Montserrat, Arial'; ctx.textAlign='left'; ctx.textBaseline='middle';
-  const dy=decalRect.y+decalRect.h*0.5;
-  ctx.fillText('DRAF', decalRect.x+14, dy);
-  const dw=ctx.measureText('DRAF').width;
-  ctx.fillStyle='#19c8de'; ctx.fillText('TECH', decalRect.x+14+dw, dy);
+/* ---------- 2 · FIBER: energizing network graph ---------- */
+place('fiber', (g)=>{
+  const e=new THREE.Group(); e.position.set(0,EMY,0); g.add(e);
+  const nodes=[]; const grid=[[-2.4,1.3],[-1.2,1.6],[0.1,1.4],[1.4,1.5],[2.5,1.0],
+    [-2.6,-0.1],[-1.3,0.2],[0.0,0.0],[1.3,0.1],[2.6,-0.2],
+    [-1.8,-1.3],[-0.4,-1.5],[1.0,-1.4],[2.2,-1.2]];
+  for(const gp of grid){ const p=V(gp[0],gp[1]); nodes.push(p); }
+  /* backbone path through the middle row */
+  const back=[5,6,7,8,9].map(i=>nodes[i]);
+  const backLine=poly(back, LM(CY_HOT,3.2)); e.add(backLine);
+  /* laterals: connect each non-backbone node to nearest backbone node */
+  const laterals=[];
+  nodes.forEach((p,i)=>{ if(i>=5&&i<=9)return; let best=7,bd=1e9;
+    for(let j=5;j<=9;j++){ const d=p.distanceTo(nodes[j]); if(d<bd){bd=d;best=j;} }
+    const l=poly([nodes[best],p], LM(CY_MID,1.6,0.5)); e.add(l); laterals.push({l,p,order:Math.random()}); });
+  /* house glyphs at the four bottom nodes */
+  const houses=[];
+  [10,11,12,13].forEach(i=>{ const p=nodes[i]; const h=new THREE.Group(); h.position.set(p.x,p.y-0.35,0); e.add(h);
+    const hs=poly([V(-0.28,0),V(-0.28,0.3),V(0,0.55),V(0.28,0.3),V(0.28,0),V(-0.28,0)], LM(CY_MID,1.4,0.55));
+    h.add(hs); houses.push(hs); });
+  const dots2=nodes.map(p=>{ const d=dot(0.8,CY); d.position.copy(p); e.add(d); return d; });
+  return {update:(tm)=>{ const cyc=(tm*0.28)%1;
+    laterals.forEach((L,i)=>{ const u=(cyc + i*0.05)%1; const on=Math.max(0,1-Math.abs(u-0.5)*3);
+      L.l.material.opacity=0.35+0.6*on; });
+    houses.forEach((h,i)=>{ const on=Math.max(0,Math.sin((cyc*TAU)-i*0.6)); h.material.color.setHex(on>0.6?AMBER:CY_MID); h.material.opacity=0.5+0.5*on; });
+    dots2.forEach((d,i)=>{ d.material.opacity=0.6+0.4*Math.sin(tm*3+i); });
+    backLine.material.opacity=0.85+0.15*Math.sin(tm*2); }};
 });
 
-const safetyAtlas = ctex(1024,1024,(ctx,w,h)=>{
-  ctx.fillStyle='#ff6a1a'; ctx.fillRect(0,0,512,h);
-  ctx.fillStyle='#f4f4f0';
-  ctx.fillRect(0,h*0.36,512,h*0.14);
-  ctx.fillRect(0,h*0.66,512,h*0.14);
-  grain(ctx,512,h,2200,0.03,0.07,0.3);
-  ctx.save();
-  ctx.beginPath(); ctx.rect(512,0,512,h); ctx.clip();
-  ctx.fillStyle='#ff6a1a'; ctx.fillRect(512,0,512,h);
-  ctx.fillStyle='#f4f4f0';
-  ctx.translate(512,0);
-  for(let i=-2;i<10;i++){
-    ctx.save();
-    ctx.translate(i*140,0);
-    ctx.rotate(Math.PI/4);
-    ctx.fillRect(-40,-800,60,2400);
-    ctx.restore();
-  }
-  ctx.restore();
-  grain(ctx,w,h,1800,0.02,0.05,0.25);
+/* ---------- 3 · OSP: pole schematic + handhole dip ---------- */
+place('osp', (g)=>{
+  const e=new THREE.Group(); e.position.set(0,EMY,0); g.add(e);
+  /* pole */
+  e.add(poly([V(0,-2.6),V(0,2.4)], LM(CY_HOT,3)));
+  /* crossarm + insulators */
+  e.add(poly([V(-1.5,1.9),V(1.5,1.9)], LM(CY,2.2)));
+  for(const x of [-1.15,0,1.15]){ e.add(poly([V(x,1.9),V(x,2.15)], LM(CY,1.6))); const d=dot(0.55,CY_HOT); d.position.set(x,2.2,0); e.add(d); }
+  /* sagging cables */
+  const cables=[];
+  for(let c=0;c<3;c++){ const y=1.0-c*0.42, pts=[]; for(let i=0;i<=24;i++){ const u=i/24; pts.push(V(-2.4+u*4.8, y-Math.sin(u*Math.PI)*0.35)); }
+    const cl=poly(pts, LM(CY_MID,1.6,0.7)); e.add(cl); cables.push(cl); }
+  /* transformer glyph */
+  e.add(poly(rectXY(0.5,0.7,0.42,0.2), LM(CY,1.6)));
+  /* handhole in the ground grid + route dip */
+  e.add(poly(rectXY(1.1,0.7,0,-2.9), LM(CY,2)));
+  e.add(poly(rectXY(0.8,0.46,0,-2.9), LM(CY_MID,1.2,0.6)));
+  const dipPts=[V(-2.5,-2.55),V(-1.1,-2.6),V(-0.35,-3.0),V(0,-3.15),V(0.35,-3.0),V(1.1,-2.6),V(2.5,-2.55)];
+  e.add(poly(dipPts, LM(CY_HOT,2.6)));
+  const led=dot(0.6,CY_HOT); led.position.set(0.42,0.2,0.05); e.add(led);
+  const pdot=dot(1.3,CY_HOT); e.add(pdot);
+  return {update:(tm)=>{ const u=(tm*0.3)%1; const idx=u*(dipPts.length-1),k=Math.floor(idx),fr=idx-k;
+    const a=dipPts[k],b=dipPts[Math.min(dipPts.length-1,k+1)];
+    pdot.position.set(a.x+(b.x-a.x)*fr,a.y+(b.y-a.y)*fr,0.06);
+    led.material.opacity=(tm%2.4)<0.2?1:0.25;
+    cables.forEach((c,i)=>c.material.opacity=0.6+0.25*Math.sin(tm*2+i)); }};
 });
 
-// ================= materials =================
-const matPaint = new THREE.MeshStandardMaterial({map:paintTex, roughness:0.32, metalness:0.18, envMapIntensity:1.1});
-const matGrille = new THREE.MeshStandardMaterial({map:atlasUV(plasticAtlas,0,0,1024,512,1024,1024), roughness:0.6, metalness:0.25});
-const matTableTop = new THREE.MeshStandardMaterial({map:atlasUV(plasticAtlas,0,512,1024,512,1024,1024), roughness:0.55, metalness:0.05});
-const matGlass = new THREE.MeshStandardMaterial({color:0x0a1420, roughness:0.12, metalness:0.05, envMapIntensity:1.4});
-const matTire = new THREE.MeshStandardMaterial({color:0x161616, roughness:0.9, metalness:0.02});
-const matSidewall = new THREE.MeshStandardMaterial({color:0x2c2c2c, roughness:0.7, metalness:0.05});
-const matDecal = new THREE.MeshStandardMaterial({map:atlasUV(paperTex,decalRect.x,decalRect.y,decalRect.w,decalRect.h,1024,1024), roughness:0.45, metalness:0.15});
-const matPaper = new THREE.MeshStandardMaterial({map:paperTex, roughness:0.75, metalness:0.0});
-const matConeSkin = new THREE.MeshStandardMaterial({map:atlasUV(safetyAtlas,0,0,512,1024,1024,1024), roughness:0.45, metalness:0.05});
-const matConeBase = new THREE.MeshStandardMaterial({color:0xe8580f, roughness:0.8, metalness:0.02});
-const matBarStripe = new THREE.MeshStandardMaterial({map:atlasUV(safetyAtlas,512,0,512,1024,1024,1024), roughness:0.35, metalness:0.03});
-const matHeadlight = new THREE.MeshStandardMaterial({color:0xece6d2, emissive:0x40331f, emissiveIntensity:0.3, roughness:0.25, metalness:0.1});
-const matLens0 = new THREE.MeshStandardMaterial({color:0xffa23c, emissive:0xffa23c, emissiveIntensity:0.6, roughness:0.35, metalness:0.1});
-const matLens1 = new THREE.MeshStandardMaterial({color:0xffa23c, emissive:0xffa23c, emissiveIntensity:0.6, roughness:0.35, metalness:0.1});
-const matLens2 = new THREE.MeshStandardMaterial({color:0xffa23c, emissive:0xffa23c, emissiveIntensity:0.6, roughness:0.35, metalness:0.1});
-const matFlasherLens = new THREE.MeshStandardMaterial({color:0xffa23c, emissive:0xffa23c, emissiveIntensity:0.6, roughness:0.35, metalness:0.1});
-const matLanternGlobe = new THREE.MeshStandardMaterial({color:0xffd9a8, emissive:0xffc27d, emissiveIntensity:1.5, roughness:0.4, metalness:0.0});
-const matPen = new THREE.MeshStandardMaterial({color:0x1a2436, roughness:0.4, metalness:0.3});
-const matClipboard = new THREE.MeshStandardMaterial({color:0x3d2c1f, roughness:0.6, metalness:0.05});
-const matGravelGround = new THREE.MeshStandardMaterial({map:gravelTex, roughness:1.0, metalness:0.0});
-const matRut = new THREE.MeshStandardMaterial({color:0x181410, roughness:0.95, metalness:0.0, transparent:true, opacity:0.38});
-const matTuft = new THREE.MeshStandardMaterial({map:tuftTex, roughness:0.9, metalness:0.0, transparent:true, alphaTest:0.4, side:THREE.DoubleSide});
+/* ---------- 4 · PERMIT: document + seal + approval check ---------- */
+place('permit', (g)=>{
+  const e=new THREE.Group(); e.position.set(0,EMY,0); g.add(e);
+  const doc=new THREE.Group(); doc.position.set(-0.4,0,0); e.add(doc);
+  doc.add(fillPanel(3.0,3.8,0.12));
+  doc.add(poly(rectXY(3.0,3.8), LM(CY,2.2)));
+  doc.add(poly(rectXY(3.0,0.6,0,1.6), LM(CY,1.6))); /* header bar */
+  for(let i=0;i<7;i++){ const y=0.9-i*0.34; const w=(i%3===0)?1.4:2.3;
+    doc.add(poly([V(-1.2,y),V(-1.2+w,y)], LM(DIMC,1.4,0.7))); }
+  doc.add(poly([V(-1.2,-1.55),V(0.2,-1.55)], LM(CY_MID,1.4,0.7))); /* signature line */
+  /* seal */
+  const seal=new THREE.Group(); seal.position.set(0.95,-1.1,0.04); e.add(seal);
+  const s1=poly(circleXY(0.62,80), LM(AMBER,2.2)); const s2=poly(circleXY(0.48,80), LM(AMBER,1.4,0.8));
+  const s3=poly(arcXY(0.4,0.3,2.6,60), LM(AMBER,1.6,0.9)); seal.add(s1,s2,s3);
+  /* checkmark */
+  const chkPts=[V(-0.28,0.02),V(-0.06,-0.24),V(0.34,0.3)];
+  const chk=poly(chkPts, LM(CY_HOT,3.4)); chk.position.set(0.95,-1.1,0.06); e.add(chk);
+  return {update:(tm)=>{ const cyc=(tm*0.16)%1;
+    const dr=Math.min(1,cyc/0.5); seal.scale.setScalar(0.6+0.4*dr); seal.children.forEach(c=>c.material.opacity=dr);
+    const ck=Math.min(1,Math.max(0,(cyc-0.5)/0.35)); setFrac(chk,Math.max(0.02,ck)); chk.material.opacity=ck;
+    const fade=cyc>0.9?(1-(cyc-0.9)/0.1):1; e.children.forEach(()=>{}); chk.material.opacity*=fade; }};
+});
 
-// ================= ground =================
-const groundPad = new THREE.Mesh(new THREE.PlaneGeometry(9.2,7.2), matGravelGround);
-groundPad.rotation.x=-Math.PI/2; groundPad.position.set(0.2,0.001,-0.4);
-groundPad.receiveShadow=true; g.add(groundPad);
+/* ---------- 5 · WIRELESS: tower glyph + signal rings ---------- */
+place('wifi', (g)=>{
+  const e=new THREE.Group(); e.position.set(0,EMY,0); g.add(e);
+  /* mast (tapered) */
+  e.add(poly([V(-0.4,-2.6),V(-0.12,1.7)], LM(CY_HOT,2.6)));
+  e.add(poly([V(0.4,-2.6),V(0.12,1.7)], LM(CY_HOT,2.6)));
+  for(let i=0;i<7;i++){ const y=-2.4+i*0.6; const w=0.4-i*0.04; e.add(poly([V(-w,y),V(w,y+0.3)],LM(CY_MID,1.2,0.6))); e.add(poly([V(w,y),V(-w,y+0.3)],LM(CY_MID,1.2,0.6))); }
+  /* sector head — 3 short panels */
+  for(const a of [ -0.6, 0, 0.6 ]){ const hx=Math.sin(a)*0.7, hy=2.0+Math.cos(a)*0.0;
+    e.add(poly(rectXY(0.16,0.5,hx,2.0), LM(CY,1.8))); }
+  const headDot=dot(1.0,CY_HOT); headDot.position.set(0,2.0,0.05); e.add(headDot);
+  /* concentric signal rings (animated) */
+  const rings=[]; for(let i=0;i<4;i++){ const r=poly(circleXY(1,80), LM(CY,1.8)); r.position.set(0,2.0,0); e.add(r); rings.push({r,o:i/4}); }
+  return {update:(tm)=>{ rings.forEach(R=>{ const u=((tm*0.35)+R.o)%1; const s=0.4+u*3.4; R.r.scale.set(s,s,1);
+    R.r.material.opacity=(1-u)*0.8; }); }};
+});
 
-function rutStrip(x,z,rot){
-  const m=new THREE.Mesh(new THREE.PlaneGeometry(0.42,3.0), matRut);
-  m.rotation.x=-Math.PI/2; m.rotation.z=rot; m.position.set(x,0.006,z);
-  m.receiveShadow=true; g.add(m);
-}
-rutStrip(0.95,0.1,0.05);
-rutStrip(2.15,0.0,-0.03);
+/* ---------- 6 · CAD / AS-BUILT: sheet with self-drawing route ---------- */
+place('cad', (g)=>{
+  const e=new THREE.Group(); e.position.set(0,EMY,0); e.rotation.x=-0.06; g.add(e);
+  e.add(fillPanel(5.2,3.4,0.12));
+  e.add(poly(rectXY(5.2,3.4), LM(CY,2.4)));
+  /* inner CAD grid */
+  for(let i=-4;i<=4;i++){ e.add(poly([V(i*0.58,-1.5),V(i*0.58,1.5)], LM(DIMC,1,0.35))); }
+  for(let i=-2;i<=2;i++){ e.add(poly([V(-2.5,i*0.6),V(2.5,i*0.6)], LM(DIMC,1,0.35))); }
+  /* title block */
+  e.add(poly(rectXY(1.5,0.6,1.7,-1.35), LM(CY,1.6)));
+  e.add(poly([V(1.0,-1.5),V(2.45,-1.5)], LM(CY_MID,1,0.7)));
+  /* the as-built route being redrawn */
+  const rpts=[V(-2.3,0.9),V(-1.4,0.4),V(-0.6,0.7),V(0.1,0.1),V(0.7,-0.5),V(1.4,-0.3),V(2.2,-0.7)];
+  e.add(poly(rpts, LM(CY_MID,1.4,0.35)));            /* ghost full route */
+  const draw=poly(rpts, LM(CY_HOT,3.2)); e.add(draw); /* bright drawn portion */
+  /* station ticks */
+  for(let i=1;i<rpts.length-1;i++){ const a=rpts[i-1],b=rpts[i+1]; const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy);
+    const nx=-dy/L,ny=dx/L; e.add(poly([V(rpts[i].x-nx*0.12,rpts[i].y-ny*0.12),V(rpts[i].x+nx*0.12,rpts[i].y+ny*0.12)],LM(CY,1.2,0.7))); }
+  const pen=dot(1.2,CY_HOT); e.add(pen);
+  return {update:(tm)=>{ const u=(tm*0.16)%1; setFrac(draw,Math.max(0.02,u));
+    const idx=u*(rpts.length-1),k=Math.floor(idx),fr=idx-k; const a=rpts[k],b=rpts[Math.min(rpts.length-1,k+1)];
+    pen.position.set(a.x+(b.x-a.x)*fr,a.y+(b.y-a.y)*fr,0.05); }};
+});
 
-function tuft(x,z,s){
-  const grp=new THREE.Group();
-  const p1=new THREE.Mesh(new THREE.PlaneGeometry(0.32*s,0.3*s), matTuft);
-  p1.position.y=0.15*s;
-  const p2=p1.clone(); p2.rotation.y=Math.PI/2;
-  grp.add(p1,p2); grp.position.set(x,0,z); g.add(grp);
-}
-tuft(-2.7,1.15,1.0); tuft(2.85,1.55,0.85); tuft(-1.0,1.85,0.9);
-
-// ================= TRUCK — proper crew-cab pickup (rounded panels + real wheels) =================
-const truckGroup = new THREE.Group();
-truckGroup.position.set(1.55,0,0.7);
-truckGroup.rotation.y=2.5;   /* front-3/4 angled toward the arriving camera */
-g.add(truckGroup);
-/* local frame: +x = front→rear axis, y up, z = width. length ~5.4m, width W, wheelbase ~3.3m */
-const W=1.98;
-const rbox=(w,h,d,r,seg)=>new RoundedBoxGeometry(w,h,d,seg||4,r);
-const matChrome=new THREE.MeshStandardMaterial({color:0xc7ccd2, roughness:0.22, metalness:1.0, envMapIntensity:1.5});
-const matBlackTrim=new THREE.MeshStandardMaterial({color:0x14161a, roughness:0.5, metalness:0.35});
-const matRim=new THREE.MeshStandardMaterial({color:0x9aa0a6, roughness:0.35, metalness:0.9, envMapIntensity:1.4});
-
-/* --- lower body / rocker (runs full length) --- */
-const lower=new THREE.Mesh(rbox(5.25,0.52,W-0.06,0.09), matPaint);
-lower.position.set(2.62,0.72,0); lower.castShadow=lower.receiveShadow=true; truckGroup.add(lower);
-
-/* --- hood + front clip --- */
-const hood=new THREE.Mesh(rbox(1.55,0.42,W-0.12,0.11), matPaint);
-hood.position.set(0.85,1.06,0); hood.rotation.z=0.02; hood.castShadow=true; truckGroup.add(hood);
-const fascia=new THREE.Mesh(rbox(0.28,0.62,W-0.04,0.1), matPaint);
-fascia.position.set(0.14,0.92,0); fascia.castShadow=true; truckGroup.add(fascia);
-
-/* --- crew cab: lower body + greenhouse (glass) + roof --- */
-const cabLower=new THREE.Mesh(rbox(2.15,0.66,W-0.05,0.1), matPaint);
-cabLower.position.set(2.35,1.12,0); cabLower.castShadow=cabLower.receiveShadow=true; truckGroup.add(cabLower);
-/* greenhouse — slightly inset dark glass block, then a paint roof on top */
-const greenhouse=new THREE.Mesh(rbox(1.92,0.56,W-0.18,0.07), matGlass);
-greenhouse.position.set(2.42,1.63,0); truckGroup.add(greenhouse);
-const aPillarF=new THREE.Mesh(rbox(0.09,0.6,W-0.16,0.03), matPaint);
-aPillarF.position.set(1.5,1.62,0); aPillarF.rotation.z=0.28; truckGroup.add(aPillarF);
-const bPillar=new THREE.Mesh(rbox(0.07,0.56,W-0.14,0.02), matBlackTrim);
-bPillar.position.set(2.45,1.63,0); truckGroup.add(bPillar);
-const roof=new THREE.Mesh(rbox(1.78,0.16,W-0.12,0.07), matPaint);
-roof.position.set(2.5,1.95,0); roof.castShadow=true; truckGroup.add(roof);
-
-/* --- bed: floor + 3 side walls + tailgate (open box) --- */
-const bedFloor=new THREE.Mesh(rbox(2.05,0.12,W-0.14,0.04), matPaint);
-bedFloor.position.set(4.35,1.02,0); bedFloor.receiveShadow=true; truckGroup.add(bedFloor);
-for(const side of [1,-1]){
-  const wall=new THREE.Mesh(rbox(2.05,0.5,0.12,0.05), matPaint);
-  wall.position.set(4.35,1.28, side*(W/2-0.09)); wall.castShadow=true; truckGroup.add(wall);
-}
-const bedFront=new THREE.Mesh(rbox(0.12,0.5,W-0.14,0.05), matPaint);
-bedFront.position.set(3.34,1.28,0); truckGroup.add(bedFront);
-const tailgate=new THREE.Mesh(rbox(0.12,0.46,W-0.14,0.05), matPaint);
-tailgate.position.set(5.38,1.24,0); tailgate.castShadow=true; truckGroup.add(tailgate);
-
-/* --- fender flares over each wheel (bulged arches) --- */
-const wheelR=0.44, frontX=1.02, rearX=4.28, axleY=wheelR, wheelZ=W/2-0.02;
-function flare(x){ for(const side of [1,-1]){
-  const arch=new THREE.Mesh(new THREE.TorusGeometry(0.56,0.11,10,20,Math.PI), matBlackTrim);
-  arch.position.set(x,axleY+0.02, side*(W/2-0.05));
-  arch.rotation.set(0, side>0?0:Math.PI, 0); arch.rotation.x=Math.PI; arch.rotation.z=Math.PI;
-  arch.rotation.y=Math.PI/2; arch.castShadow=true; truckGroup.add(arch);
-}}
-flare(frontX); flare(rearX);
-
-/* --- grille + chrome bar + headlights --- */
-const grille=new THREE.Mesh(rbox(0.08,0.34,1.18,0.02), matGrille);
-grille.position.set(0.05,1.0,0); truckGroup.add(grille);
-const chromeBar=new THREE.Mesh(rbox(0.06,0.08,1.24,0.02), matChrome);
-chromeBar.position.set(0.03,1.12,0); truckGroup.add(chromeBar);
-for(const side of [1,-1]){
-  const hl=new THREE.Mesh(rbox(0.1,0.16,0.3,0.03), matHeadlight);
-  hl.position.set(0.06,1.06, side*0.62); truckGroup.add(hl);
-}
-/* front + rear bumpers (chromed) */
-const fBumper=new THREE.Mesh(rbox(0.16,0.22,W+0.02,0.05), matChrome);
-fBumper.position.set(-0.02,0.72,0); fBumper.castShadow=true; truckGroup.add(fBumper);
-const rBumper=new THREE.Mesh(rbox(0.16,0.22,W+0.02,0.05), matChrome);
-rBumper.position.set(5.46,0.72,0); rBumper.castShadow=true; truckGroup.add(rBumper);
-
-/* --- mirrors --- */
-for(const side of [1,-1]){
-  const stalk=new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.016,0.18,10), matBlackTrim);
-  stalk.position.set(1.62,1.5, side*(W/2+0.04)); stalk.rotation.x=side*0.5; truckGroup.add(stalk);
-  const housing=new THREE.Mesh(rbox(0.08,0.16,0.11,0.03), matBlackTrim);
-  housing.position.set(1.58,1.52, side*(W/2+0.13)); truckGroup.add(housing);
-}
-/* door seam + handle so the side reads as a door */
-for(const side of [1,-1]){
-  const seam=new THREE.Mesh(new THREE.BoxGeometry(0.012,0.5,0.006), matBlackTrim);
-  seam.position.set(2.9,1.12, side*(W/2)); truckGroup.add(seam);
-  const handle=new THREE.Mesh(rbox(0.12,0.03,0.02,0.01), matChrome);
-  handle.position.set(2.6,1.28, side*(W/2+0.01)); truckGroup.add(handle);
-}
-
-// door decal (DRAFTECH)
-for(const side of [1,-1]){
-  const doorDecal=new THREE.Mesh(new THREE.PlaneGeometry(0.62,0.36), matDecal);
-  doorDecal.position.set(2.4,1.06, side*(W/2+0.005));
-  doorDecal.rotation.y=side>0?-Math.PI/2:Math.PI/2;
-  truckGroup.add(doorDecal);
-}
-
-/* --- wheels: tire + multi-spoke rim + hub + brake disc --- */
-function wheel(x,z,steer){
-  const grp=new THREE.Group();
-  const tire=new THREE.Mesh(new THREE.CylinderGeometry(wheelR,wheelR,0.34,32,1,true), matTire);
-  tire.rotation.x=Math.PI/2; tire.castShadow=true; grp.add(tire);
-  for(const s of [1,-1]){ /* sidewalls */
-    const sw=new THREE.Mesh(new THREE.RingGeometry(0.26,wheelR,32), matSidewall);
-    sw.position.z=s*0.17; if(s<0)sw.rotation.y=Math.PI; grp.add(sw);
-  }
-  const rim=new THREE.Mesh(new THREE.CylinderGeometry(0.27,0.27,0.24,28), matRim);
-  rim.rotation.x=Math.PI/2; grp.add(rim);
-  const dish=new THREE.Mesh(new THREE.CircleGeometry(0.26,28), matRim);
-  dish.position.z=0.18; grp.add(dish);
-  for(let i=0;i<6;i++){ const a=i/6*Math.PI*2; /* spokes */
-    const sp=new THREE.Mesh(rbox(0.05,0.34,0.03,0.01), matRim);
-    sp.position.set(Math.cos(a)*0.15, Math.sin(a)*0.15, 0.185); sp.rotation.z=a; grp.add(sp);
-  }
-  const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.06,16), matChrome);
-  cap.rotation.x=Math.PI/2; cap.position.z=0.2; grp.add(cap);
-  grp.position.set(x,axleY,z); if(steer) grp.rotation.y=0.12; truckGroup.add(grp);
-}
-for(const side of [1,-1]){ wheel(frontX, side*wheelZ, side>0); wheel(rearX, side*wheelZ, false); }
-
-// roof lightbar (amber)
-const lightbarGrp=new THREE.Group(); lightbarGrp.position.set(2.35,2.06,0); truckGroup.add(lightbarGrp);
-const barHousing=new THREE.Mesh(rbox(0.98,0.09,0.22,0.03), matBlackTrim);
-barHousing.castShadow=true; lightbarGrp.add(barHousing);
-const lensMats=[matLens0, matLens1, matLens2];
-const lensSegs=[];
-for(let i=0;i<3;i++){
-  const seg=new THREE.Mesh(rbox(0.28,0.1,0.18,0.02), lensMats[i]);
-  seg.position.set((i-1)*0.31,0.02,0); lightbarGrp.add(seg); lensSegs.push(seg);
-}
-
-// ================= PERMIT TABLE =================
-const tableGroup = new THREE.Group();
-tableGroup.position.set(2.55,0,-1.15);
-tableGroup.rotation.y=0.28;
-g.add(tableGroup);
-
-const tableTop = new THREE.Mesh(new THREE.BoxGeometry(1.2,0.05,0.7), matTableTop);
-tableTop.position.y=0.74; tableTop.castShadow=true; tableTop.receiveShadow=true;
-tableGroup.add(tableTop);
-
-function xLeg(sideX){
-  const legLen=Math.hypot(0.68,0.72);
-  const legA=new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,legLen,10), MATP.steel);
-  legA.position.set(sideX,0.37,0);
-  legA.rotation.z = sideX>0 ? 0.78 : -0.78;
-  tableGroup.add(legA);
-  const legB=legA.clone();
-  legB.rotation.z = sideX>0 ? -0.78 : 0.78;
-  tableGroup.add(legB);
-}
-xLeg(0.5); xLeg(-0.5);
-
-// clipboard + paper + pen
-const clipboard = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.02,0.46), matClipboard);
-clipboard.position.set(-0.25,0.775,0.05); clipboard.rotation.y=0.15;
-clipboard.castShadow=true; tableGroup.add(clipboard);
-const clipBar = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.02,0.05), MATP.dark);
-clipBar.position.set(-0.25,0.79,0.25); clipBar.rotation.y=0.15; tableGroup.add(clipBar);
-const paperMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.29,0.4), matPaper);
-paperMesh.position.set(-0.25,0.787,0.03); paperMesh.rotation.x=-Math.PI/2; paperMesh.rotation.z=0.15;
-tableGroup.add(paperMesh);
-const pen = new THREE.Mesh(new THREE.CylinderGeometry(0.006,0.006,0.15,10), matPen);
-pen.position.set(-0.12,0.79,-0.08); pen.rotation.z=Math.PI/2; pen.rotation.y=0.4;
-tableGroup.add(pen);
-
-// hardhat (lathe)
-const hhPts=[
-  new THREE.Vector2(0.19,0.0),
-  new THREE.Vector2(0.185,0.006),
-  new THREE.Vector2(0.14,0.018),
-  new THREE.Vector2(0.115,0.03),
-  new THREE.Vector2(0.118,0.055),
-  new THREE.Vector2(0.10,0.09),
-  new THREE.Vector2(0.065,0.12),
-  new THREE.Vector2(0.02,0.135),
-  new THREE.Vector2(0.0,0.14)
-];
-const hatGeo = new THREE.LatheGeometry(hhPts,32);
-const hardhat = new THREE.Mesh(hatGeo, new THREE.MeshStandardMaterial({map:paintTex, roughness:0.55, metalness:0.05}));
-hardhat.position.set(0.3,0.775,-0.06);
-hardhat.rotation.z=0.12;
-hardhat.castShadow=true;
-tableGroup.add(hardhat);
-const hatDecal = new THREE.Mesh(new THREE.PlaneGeometry(0.07,0.04), matDecal);
-hatDecal.position.set(0.122,0.055,0);
-hatDecal.rotation.y=Math.PI/2*0.65;
-hardhat.add(hatDecal);
-
-// camp lantern
-const lanternGrp = new THREE.Group();
-lanternGrp.position.set(0.46,0.765,0.27);
-tableGroup.add(lanternGrp);
-const lanternBody = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.055,0.12,16), MATP.dark);
-lanternBody.position.y=0.06; lanternBody.castShadow=true; lanternGrp.add(lanternBody);
-const lanternGlobe = new THREE.Mesh(new THREE.SphereGeometry(0.055,16,12), matLanternGlobe);
-lanternGlobe.position.y=0.15; lanternGrp.add(lanternGlobe);
-const lanternHandle = new THREE.Mesh(new THREE.TorusGeometry(0.065,0.006,8,20,Math.PI), MATP.steel);
-lanternHandle.position.y=0.2; lanternHandle.rotation.x=Math.PI/2;
-lanternGrp.add(lanternHandle);
-const lanternLight = addPractical(new THREE.PointLight(0xffc27d, 2.6, 4, 2));
-lanternLight.position.set(0,0.16,0);
-lanternGrp.add(lanternLight);
-
-// ================= TRAFFIC CONES =================
-function makeCone(x,z,tilt){
-  const grp=new THREE.Group();
-  const base=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.03,0.22), matConeBase);
-  base.position.y=0.015; base.castShadow=true; base.receiveShadow=true;
-  const body=new THREE.Mesh(new THREE.ConeGeometry(0.095,0.45,20), matConeSkin);
-  body.position.y=0.03+0.225; body.castShadow=true;
-  grp.add(base,body);
-  grp.position.set(x,0,z);
-  if(tilt){ grp.rotation.z=0.32; grp.position.y=0.02; }
-  g.add(grp);
-}
-makeCone(-0.35,-0.1,false);
-makeCone(0.4,-1.4,false);
-makeCone(-1.3,-0.55,false);
-makeCone(-1.95,-1.75,true);
-
-// ================= TYPE III BARRICADE =================
-const barricadeGrp = new THREE.Group();
-barricadeGrp.position.set(-2.05,0,0.25);
-barricadeGrp.rotation.y=0.42;
-g.add(barricadeGrp);
-
-function aFrame(offsetX){
-  const frm=new THREE.Group();
-  const legLen=0.95;
-  const legL=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,legLen,10), MATP.dark);
-  legL.position.set(-0.22,legLen/2*0.94,0); legL.rotation.z=0.32; legL.castShadow=true;
-  const legR=legL.clone(); legR.position.x=0.22; legR.rotation.z=-0.32;
-  const foot=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.04,0.16), MATP.dark);
-  foot.position.y=0.02;
-  frm.add(legL,legR,foot);
-  frm.position.x=offsetX;
-  barricadeGrp.add(frm);
-}
-aFrame(-0.85); aFrame(0.85);
-
-const railYs=[0.45,0.72,0.99];
-for(const ry of railYs){
-  const rail=new THREE.Mesh(new THREE.BoxGeometry(1.9,0.16,0.05), matBarStripe);
-  rail.position.set(0,ry,0); rail.castShadow=true;
-  barricadeGrp.add(rail);
-}
-const flasher = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.07,16), matFlasherLens);
-flasher.position.set(0,1.09,0);
-barricadeGrp.add(flasher);
-const beaconLight = addPractical(new THREE.PointLight(0xffa23c, 2.0, 6, 2));
-beaconLight.position.set(2.3,1.95,0);
-truckGroup.add(beaconLight);
-
-// ================= LOOP =================
-const TWO_PI=Math.PI*2;
-const camPos=new THREE.Vector3().copy(P).addScaledVector(SD,-4.2).addScaledVector(TN,-7.8);
-camPos.y=1.9;
-const lookAt=new THREE.Vector3(g.position.x,1.0,g.position.z);
-SCENES.permit = {
-  group:g,
-  camPos:camPos,
-  lookAt:lookAt,
-  update:function(time,act){
-    const w=act!==undefined?act:1;
-    const period=1.8;
-    const ph=time*(TWO_PI/period);
-    for(let i=0;i<3;i++){
-      const s=0.5+0.5*Math.sin(ph - i*(TWO_PI/3));
-      const inten=0.35+1.35*Math.pow(s,3)*(0.6+0.4*w);
-      lensSegs[i].material.emissiveIntensity=inten;
-    }
-    beaconLight.intensity=1.2+1.6*Math.pow(0.5+0.5*Math.sin(ph),3)*(0.6+0.4*w);
-
-    const fph=ph+Math.PI;
-    const fs=0.5+0.5*Math.sin(fph);
-    flasher.material.emissiveIntensity=0.4+1.3*Math.pow(fs,3)*(0.6+0.4*w);
-
-    const flick=1+0.05*Math.sin(time*9.1)+0.04*Math.sin(time*5.3);
-    lanternLight.intensity=2.6*flick;
-    matLanternGlobe.emissiveIntensity=1.5*flick;
-
-    paperMesh.rotation.x=-Math.PI/2+0.012*Math.sin(time*1.3);
-    paperMesh.rotation.z=0.15+0.006*Math.sin(time*1.7+0.6);
-  }
-};
-}
-
-
-/* ---------- engine-side cinematography (34mm lens — subjects fill the frame) ---------- */
-function stopBasis(key){ const s=STOPS.find(o=>o.key===key);
-  return {s, p:rp(s.t), sd:sideOf(s.t), tn:rt(s.t), gp:SCENES[key].group.position}; }
-/* survey: hero medium close-up — full tripod in frame, center-right */
-{ const {p,sd,tn,gp}=stopBasis('survey');
-  SCENES.survey.camPos=new THREE.Vector3(gp.x-sd.x*2.6+tn.x*-3.2, 1.5, gp.z-sd.z*2.6+tn.z*-3.2);
-  SCENES.survey.lookAt=new THREE.Vector3(gp.x+tn.x*.15, .95, gp.z+tn.z*.15);
-}
-/* fiber: high oblique over the lit grid — the network IS the frame */
-{ const {p,sd,tn}=stopBasis('fiber');
-  SCENES.fiber.camPos=new THREE.Vector3(p.x-sd.x*7+tn.x*-10, 27, p.z-sd.z*7+tn.z*-10);
-  SCENES.fiber.lookAt=new THREE.Vector3(p.x+sd.x*16+tn.x*-2, 0, p.z+sd.z*16+tn.z*-2);
-}
-/* osp: swing around so the pole sits left-third and the cabinet/handhole fill center-right */
-{ const {p,sd,tn,gp}=stopBasis('osp');
-  SCENES.osp.camPos=new THREE.Vector3(gp.x-sd.x*5.6+tn.x*-4.4, 1.75, gp.z-sd.z*5.6+tn.z*-4.4);
-  SCENES.osp.lookAt=new THREE.Vector3(gp.x+sd.x*1.1+tn.x*1.0, 1.2, gp.z+sd.z*1.1+tn.z*1.0);
-}
-/* permit: cinematic front-3/4 hero on the truck, work zone reading behind */
-{ const {p,sd,tn,gp}=stopBasis('permit');
-  SCENES.permit.camPos=new THREE.Vector3(gp.x-sd.x*7.8+tn.x*-12.2, 2.5, gp.z-sd.z*7.8+tn.z*-12.2);
-  SCENES.permit.lookAt=new THREE.Vector3(gp.x+tn.x*1.6, 1.25, gp.z+tn.z*1.6);
-}
-/* wireless: hero angle — full head-frame in shot, monopole fills frame height */
-{ const {p,sd,tn,gp}=stopBasis('wifi');
-  SCENES.wifi.camPos=new THREE.Vector3(gp.x-sd.x*5.8+tn.x*-7.4, 2.4, gp.z-sd.z*5.8+tn.z*-7.4);
-  SCENES.wifi.lookAt=new THREE.Vector3(gp.x, 5.5, gp.z);
-}
-/* cad (finale): operator side, angled past the canopy post — both screens read */
-{ const {p,sd,tn,gp}=stopBasis('cad');
-  SCENES.cad.camPos=new THREE.Vector3(gp.x+sd.x*3.1+tn.x*-1.6, 1.44, gp.z+sd.z*3.1+tn.z*-1.6);
-  SCENES.cad.lookAt=new THREE.Vector3(gp.x+tn.x*.3, 1.0, gp.z+tn.z*.3);
-}
-/* ---------- film rig: neutral key + soft fill riding the active stop ---------- */
-/* per-stop intensities — the opener keeps its own warm lamp; the aerial uses area lights */
-const RIG={open:{k:0,f:5}, survey:{k:46,f:32}, fiber:{k:0,f:900}, osp:{k:46,f:34},
-           permit:{k:52,f:40}, wifi:{k:44,f:30}, cad:{k:26,f:22}};
-const stationFill=new THREE.PointLight(0xe8eef6, 40, 30, 2);   /* cool ambient lift */
-scene.add(stationFill);
-const keyLight=new THREE.SpotLight(0xf2f6fa, 70, 40, .72, .5, 1.8);  /* white LED work-light key */
-keyLight.castShadow=false;
-scene.add(keyLight); scene.add(keyLight.target);
-/* fiber aerial: neutral area lift over the neighborhood grid (+SD side) */
-{
-  const s=STOPS.find(o=>o.key==='fiber'), p=rp(s.t), sd=sideOf(s.t);
-  /* aerial scale: decay-2 point lights need hundreds of candela to matter from 15-20m up
-     (GTAO darkens interiors further, so lift generously) */
-  const hoodFill=new THREE.PointLight(0xb4c4d8, 1150, 110, 2);
-  hoodFill.position.set(p.x+sd.x*16, 20, p.z+sd.z*16);
-  scene.add(hoodFill);
-  const hoodLift=new THREE.PointLight(0xe2ebf3, 420, 54, 2);
-  hoodLift.position.set(p.x+sd.x*8, 10, p.z+sd.z*8);
-  scene.add(hoodLift);
-  const hoodBack=new THREE.PointLight(0x9fb4cc, 520, 90, 2);
-  hoodBack.position.set(p.x+sd.x*24, 16, p.z+sd.z*10);
-  scene.add(hoodBack);
-}
-
-/* ================= state machine (swipe → travel → loop) ================= */
+/* ================= CAMERA STATE MACHINE (travel → loop) ================= */
 let cur=bootStop, mode='loop', locked=false, coolUntil=0;
-let tvT0=0, tvDur=2.2, tvFromPos=new THREE.Vector3(), tvFromLook=new THREE.Vector3();
-let tvA=0, tvB=0;         /* route t of from/to stops */
+let tvT0=0, tvDur=2.2, tvFromPos=new THREE.Vector3(), tvA=0, tvB=0;
 const camPos=new THREE.Vector3(), camLook=new THREE.Vector3();
 const easeIO=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
-const clockNow=()=>performance.now()/1000;
-
-function stopPose(i){ const sc=SCENES[STOPS[i].key]; return {pos:sc.camPos, look:sc.lookAt}; }
-
-function setImmediate(i){
-  cur=i; mode='loop';
-  const p=stopPose(i);
-  camPos.copy(p.pos); camLook.copy(p.look);
-  updateDots(); showCaption(i);
-}
-function travelTo(i){
-  if(i<0||i>STOPS.length-1||locked) return;
-  locked=true; hideCaptions();
-  tvFromPos.copy(camPos); tvFromLook.copy(camLook);
-  tvA=STOPS[cur].t; tvB=STOPS[i].t;
-  const dist=Math.abs(tvB-tvA);
-  tvDur=reduce? .001 : Math.max(1.5,Math.min(3.2,dist*9));
-  tvT0=clockNow();
-  cur=i; mode='travel'; updateDots();
-}
-
-/* camera update per frame */
+const nowS=()=>performance.now()/1000;
+function pose(i){ const s=SCENES[STOPS[i].key]; return {pos:s.camPos, look:s.lookAt}; }
+function setImmediate(i){ cur=i; mode='loop'; const p=pose(i); camPos.copy(p.pos); camLook.copy(p.look); updateDots(); showCaption(i); }
+function travelTo(i){ if(i<0||i>STOPS.length-1||locked)return; locked=true; hideCaptions();
+  tvFromPos.copy(camPos); tvA=STOPS[cur].t; tvB=STOPS[i].t;
+  tvDur=reduce?0.001:Math.max(1.4,Math.min(3.0,Math.abs(tvB-tvA)*9)); tvT0=nowS(); cur=i; mode='travel'; updateDots();
+  if(reduce){ const p=pose(i); camPos.copy(p.pos); camLook.copy(p.look); mode='loop'; locked=false; showCaption(i); } }
 const bez=new THREE.Vector3(), tmpV=new THREE.Vector3(), tmpU=new THREE.Vector3();
-function updateCamera(time){
-  if(mode==='travel'){
-    const u=Math.min(1,(clockNow()-tvT0)/tvDur), e=easeIO(u);
-    const p=stopPose(cur);
-    /* look target rides the LINE the whole way, blends into stop look at the end */
-    const tNow=tvA+(tvB-tvA)*e;
-    const lp=rp(tNow);
-    tmpV.set(lp.x,lp.y+.4,lp.z);
-    const lookBlend=Math.pow(Math.max(0,(e-.72)/.28),1.4);
-    camLook.copy(tmpV).lerp(p.look,lookBlend);
-    /* position: bezier from start pose to end pose lifted along the route */
-    const mid=tvFromPos.clone().add(p.pos).multiplyScalar(.5);
-    mid.y+=2.4+Math.abs(tvB-tvA)*22;
-    const q1=tvFromPos.clone().lerp(mid,e), q2=mid.clone().lerp(p.pos,e);
-    bez.copy(q1).lerp(q2,e);
-    camPos.copy(bez);
-    if(u>=1){ mode='loop'; locked=false; coolUntil=clockNow()+.45; showCaption(cur); }
-  } else {
-    const p=stopPose(cur);
-    const b=reduce?0:Math.sin(time*.78)*.04;
-    camPos.lerp(tmpU.copy(p.pos).add(tmpV.set(mx*0.5,b+my*-.3,0)),.06);
-    camLook.lerp(p.look,.08);
-  }
-  camera.position.copy(camPos);
-  camera.lookAt(camLook);
-  /* shadow window follows the view */
-  sun.target.position.copy(camLook); sun.target.updateMatrixWorld();
-  sun.position.set(camLook.x+46,20,camLook.z-30);
-}
-
-/* pointer parallax */
 let tmx=0,tmy=0,mx=0,my=0;
 addEventListener('pointermove',e=>{ tmx=e.clientX/innerWidth-.5; tmy=e.clientY/innerHeight-.5; },{passive:true});
+function updateCamera(time){
+  if(mode==='travel'){ const u=Math.min(1,(nowS()-tvT0)/tvDur), e=easeIO(u); const p=pose(cur);
+    const tNow=tvA+(tvB-tvA)*e, lp=rp(tNow); tmpV.set(lp.x,lp.y+1.2,lp.z);
+    const lb=Math.pow(Math.max(0,(e-0.68)/0.32),1.3); camLook.copy(tmpV).lerp(p.look,lb);
+    const mid=tvFromPos.clone().add(p.pos).multiplyScalar(0.5); mid.y+=2.2+Math.abs(tvB-tvA)*10;
+    const q1=tvFromPos.clone().lerp(mid,e), q2=mid.clone().lerp(p.pos,e); bez.copy(q1).lerp(q2,e); camPos.copy(bez);
+    if(u>=1){ mode='loop'; locked=false; coolUntil=nowS()+0.45; showCaption(cur); }
+  } else { const p=pose(cur); const b=reduce?0:Math.sin(time*0.6)*0.12;
+    const orbit=reduce?0:Math.sin(time*0.32)*0.5;
+    camPos.lerp(tmpU.copy(p.pos).add(tmpV.set(mx*0.7+orbit,b+my*-0.4,0)),0.05);
+    camLook.lerp(p.look,0.07); }
+  camera.position.copy(camPos); camera.lookAt(camLook);
+}
 
 /* ================= UI ================= */
 const capOpen=document.getElementById('capOpen'), capPhase=document.getElementById('capPhase');
@@ -3212,136 +603,68 @@ const phNum=document.getElementById('phNum'), phKick=document.getElementById('ph
       phTitle=document.getElementById('phTitle'), phSub=document.getElementById('phSub'), phTags=document.getElementById('phTags');
 const cue=document.getElementById('cue'), cueTxt=document.getElementById('cueTxt');
 function hideCaptions(){ capOpen.classList.remove('show'); capPhase.classList.remove('show'); }
-function showCaption(k){
-  if(k===0){ capOpen.classList.add('show'); capPhase.classList.remove('show'); cueTxt.textContent='SWIPE'; cue.style.opacity='1'; }
-  else{
-    phNum.textContent=('0'+k).slice(-2);
-    phKick.textContent=STOPS[k].kick; phTitle.textContent=STOPS[k].title; phSub.textContent=STOPS[k].sub;
+function showCaption(k){ if(k===0){ capOpen.classList.add('show'); capPhase.classList.remove('show'); cueTxt.textContent='SWIPE'; cue.style.opacity='1'; }
+  else{ phNum.textContent=('0'+k).slice(-2); phKick.textContent=STOPS[k].kick; phTitle.textContent=STOPS[k].title; phSub.textContent=STOPS[k].sub;
     phTags.innerHTML=STOPS[k].tags.map(t=>'<span class="tag">'+t+'</span>').join('');
     capPhase.classList.add('show'); capOpen.classList.remove('show');
-    cueTxt.textContent=(k===STOPS.length-1)?'SCROLL ↓':'SWIPE';
-    cue.style.opacity=(k===STOPS.length-1)?'1':'.85';
-  }
-}
+    cueTxt.textContent=(k===STOPS.length-1)?'SCROLL ↓':'SWIPE'; cue.style.opacity=(k===STOPS.length-1)?'1':'.85'; } }
 const dotsWrap=document.getElementById('dots'), prail=document.getElementById('prail'), dotEls=[];
-STOPS.forEach((s,idx)=>{
-  const b=document.createElement('button');
-  b.setAttribute('role','tab');
-  b.setAttribute('aria-label',idx===0?'Intro':s.title);
-  b.setAttribute('data-label',idx===0?'Start':s.title);
-  b.addEventListener('click',()=>{ if(!locked&&idx!==cur) travelTo(idx); });
-  dotsWrap.appendChild(b); dotEls.push(b);
-});
+STOPS.forEach((s,idx)=>{ const b=document.createElement('button'); b.setAttribute('role','tab');
+  b.setAttribute('aria-label',idx===0?'Intro':s.title); b.setAttribute('data-label',idx===0?'Start':s.title);
+  b.addEventListener('click',()=>{ if(!locked&&idx!==cur) travelTo(idx); }); dotsWrap.appendChild(b); dotEls.push(b); });
 function updateDots(){ dotEls.forEach((b,i)=>{ b.classList.toggle('active',i===cur); b.classList.toggle('done',i<cur); });
   prail.style.width=(cur/(STOPS.length-1)*100)+'%'; }
-
-/* nav */
 function next(){ if(locked)return; if(cur<STOPS.length-1) travelTo(cur+1); else exitToPage(); }
 function prev(){ if(locked)return; if(cur>0) travelTo(cur-1); }
 const hero=document.getElementById('hero');
-function exitToPage(){ document.body.classList.remove('hero-active'); document.body.classList.add('reading');
-  hero.classList.add('dismissed'); window.scrollTo(0,0); }
-function enterHero(){ document.body.classList.add('hero-active'); document.body.classList.remove('reading');
-  hero.classList.remove('dismissed'); setImmediate(STOPS.length-1); }
-
+function exitToPage(){ document.body.classList.remove('hero-active'); document.body.classList.add('reading'); hero.classList.add('dismissed'); window.scrollTo(0,0); }
+function enterHero(){ document.body.classList.add('hero-active'); document.body.classList.remove('reading'); hero.classList.remove('dismissed'); setImmediate(STOPS.length-1); }
 let acc=0; const THRESH=42;
-addEventListener('wheel',e=>{
-  if(document.body.classList.contains('hero-active')){
-    e.preventDefault();
-    if(locked||clockNow()<coolUntil){ acc=0; return; }
-    if((acc>0&&e.deltaY<0)||(acc<0&&e.deltaY>0)) acc=0;
-    acc+=e.deltaY;
-    if(acc>THRESH){ acc=0; next(); } else if(acc<-THRESH){ acc=0; prev(); }
-  } else if(window.scrollY<=0 && e.deltaY<-30){ e.preventDefault(); enterHero(); }
-},{passive:false});
-addEventListener('keydown',e=>{
-  if(!document.body.classList.contains('hero-active'))return;
-  if(['ArrowDown','PageDown',' ','Spacebar','ArrowRight'].indexOf(e.key)>=0){ e.preventDefault(); next(); }
-  else if(['ArrowUp','PageUp','ArrowLeft'].indexOf(e.key)>=0){ e.preventDefault(); prev(); }
-});
-let tY=null,tActive=false;
-addEventListener('touchstart',e=>{ if(document.body.classList.contains('hero-active')){ tActive=true; tY=e.touches[0].clientY; } },{passive:true});
+addEventListener('wheel',e=>{ if(document.body.classList.contains('hero-active')){ e.preventDefault();
+    if(locked||nowS()<coolUntil){acc=0;return;} if((acc>0&&e.deltaY<0)||(acc<0&&e.deltaY>0))acc=0; acc+=e.deltaY;
+    if(acc>THRESH){acc=0;next();} else if(acc<-THRESH){acc=0;prev();} }
+  else if(window.scrollY<=0 && e.deltaY<-30){ e.preventDefault(); enterHero(); } },{passive:false});
+addEventListener('keydown',e=>{ if(!document.body.classList.contains('hero-active'))return;
+  if(['ArrowDown','PageDown',' ','Spacebar','ArrowRight'].indexOf(e.key)>=0){e.preventDefault();next();}
+  else if(['ArrowUp','PageUp','ArrowLeft'].indexOf(e.key)>=0){e.preventDefault();prev();} });
+let tY=null,tAct=false;
+addEventListener('touchstart',e=>{ if(document.body.classList.contains('hero-active')){tAct=true;tY=e.touches[0].clientY;} },{passive:true});
 addEventListener('touchmove',e=>{ if(document.body.classList.contains('hero-active')) e.preventDefault(); },{passive:false});
-addEventListener('touchend',e=>{ if(!tActive)return; tActive=false;
-  const dy=e.changedTouches[0].clientY-tY; if(Math.abs(dy)<40)return; (dy<0)?next():prev(); },{passive:true});
-document.getElementById('backtop').addEventListener('click',e=>{ e.preventDefault(); enterHero(); });
-document.getElementById('herohome').addEventListener('click',e=>{ e.preventDefault(); if(cur!==0&&!locked) travelTo(0); });
-document.getElementById('hdrhome').addEventListener('click',e=>{ e.preventDefault(); enterHero(); });
-
-/* QA hook */
+addEventListener('touchend',e=>{ if(!tAct)return; tAct=false; const dy=e.changedTouches[0].clientY-tY; if(Math.abs(dy)<40)return; (dy<0)?next():prev(); },{passive:true});
+document.getElementById('backtop').addEventListener('click',e=>{e.preventDefault();enterHero();});
+document.getElementById('herohome').addEventListener('click',e=>{e.preventDefault(); if(cur!==0&&!locked)travelTo(0);});
+document.getElementById('hdrhome').addEventListener('click',e=>{e.preventDefault();enterHero();});
 window.__J={ get cur(){return cur;}, get mode(){return mode;}, go:travelTo, set:setImmediate };
 
 /* ================= resize / loop ================= */
-function resize(){
-  const r=canvas.getBoundingClientRect();
-  const pr=Math.min(devicePixelRatio||1,isMobile?1.5:2);
-  renderer.setPixelRatio(pr);
-  renderer.setSize(r.width,r.height,false);
-  composer.setPixelRatio(pr);
-  composer.setSize(r.width,r.height);
+function resize(){ const r=canvas.getBoundingClientRect(); const pr=Math.min(devicePixelRatio||1, isMobile?2:2);
+  renderer.setPixelRatio(pr); renderer.setSize(r.width,r.height,false);
+  composer.setPixelRatio(pr); composer.setSize(r.width,r.height);
   camera.aspect=r.width/r.height; camera.updateProjectionMatrix();
-}
+  lineMats.forEach(m=>m.resolution.set(r.width,r.height)); }
 addEventListener('resize',resize);
 
-/* scene visibility: only near stops render their groups */
-function cullScenes(){
-  const keys=Object.keys(SCENES);
-  keys.forEach(k=>{
-    const idx=STOPS.findIndex(s=>s.key===k);
-    SCENES[k].group.visible = Math.abs(idx-cur)<=1 || mode==='travel';
-  });
-}
-
-const clock=new THREE.Clock();
-let frames=0;
-function frame(){
-  const time=clock.getElapsedTime();
-  mx+=(tmx-mx)*.05; my+=(tmy-my)*.05;
-  updateCamera(time);
-  { const sc=SCENES[STOPS[cur].key];
-    if(sc){ const gp=sc.group.position, rig=RIG[STOPS[cur].key]||{k:40,f:28};
-      stationFill.intensity=rig.f;
-      keyLight.intensity=rig.k;
-      if(STOPS[cur].key==='fiber'){ /* aerial: fill floats over the neighborhood itself */
-        stationFill.position.set(sc.lookAt.x, 13, sc.lookAt.z);
-      } else {
-        stationFill.position.set((gp.x+camPos.x)/2, Math.max(4.4,(sc.lookAt.y||1)+3.6), (gp.z+camPos.z)/2);
-      }
-      /* key: high camera-left, raking across the subject like an LED site flood */
-      const vx=sc.lookAt.x-camPos.x, vz=sc.lookAt.z-camPos.z, vl=Math.hypot(vx,vz)||1;
-      const lx=-(vz/vl), lz=(vx/vl); /* left-perp of view dir */
-      keyLight.position.set(camPos.x+lx*3.4, camPos.y+3.2, camPos.z+lz*3.4);
-      keyLight.target.position.copy(sc.lookAt); keyLight.target.updateMatrixWorld(); } }
-  if(routeShader) routeShader.uniforms.uTime.value=time;
-  const act=1;
-  for(const k in SCENES){ if(SCENES[k].group.visible!==false) SCENES[k].update(time,act); }
-  sceneUpdaters.forEach(f=>f(time));
-  cullScenes();
-  /* rack focus to the subject; aerial stop wants deep focus */
-  if(bokeh){ const fd=camPos.distanceTo(camLook);
-    bokeh.uniforms['focus'].value += (fd-bokeh.uniforms['focus'].value)*.12;
-    const aer=STOPS[cur].key==='fiber';
-    bokeh.uniforms['aperture'].value = aer? 0.00012 : 0.00055; }
+const clock=new THREE.Clock(); let frames=0;
+function frame(){ const time=clock.getElapsedTime();
+  mx+=(tmx-mx)*.05; my+=(tmy-my)*.05; updateCamera(time);
+  /* grid follows camera */
+  if(window.__grid){ window.__grid.mesh.position.set(camLook.x,0,camLook.z); window.__grid.mat.uniforms.uCenter.value.set(camLook.x,camLook.z); }
+  /* route pulses */
+  for(const P of pulses){ const u=(P.o+time*0.06)%1; const p=rp(u); P.d.position.copy(p); P.d.position.y=0.18; }
+  routeLine.material.opacity=0.85+0.15*Math.sin(time*1.6);
+  /* isolate emblems: only the one the camera is focused on is shown (reveals along travel) */
+  for(const k in SCENES){ const s=SCENES[k];
+    const d=Math.hypot(s.group.position.x-camLook.x, s.group.position.z-camLook.z);
+    const vis=d<10.5; s.group.visible=vis; if(vis) s.update(time); }
   gradePass.uniforms.uTime.value=time;
   composer.render();
-  frames++;
-  if(frames===2){ loaderPct(100); setTimeout(loaderDone,250); }
+  frames++; if(frames===2){ loaderPct(100); setTimeout(loaderDone,250); }
   requestAnimationFrame(frame);
 }
-
-/* boot */
-loaderPct(30,'BUILDING THE WORLD');
-resize();
-setImmediate(bootStop);
-loaderPct(70,'LIGHTING THE ROUTE');
-/* pre-compile every scene's materials up front so the first swipe (which reveals all
-   scenes at once) never hitches mid-travel */
-try{ Object.keys(SCENES).forEach(k=>{ SCENES[k].group.visible=true; });
-     renderer.compile(scene,camera); composer.render(); }catch(e){}
-requestAnimationFrame(frame);
-setTimeout(loaderDone,12000);
-
-} /* boot() */
+loaderPct(40,'DRAWING THE ROUTE'); resize(); setImmediate(bootStop); loaderPct(80,'ENERGIZING');
+try{ renderer.compile(scene,camera); composer.render(); }catch(e){}
+requestAnimationFrame(frame); setTimeout(loaderDone,12000);
+} /* boot */
 </script>
 </body>
 </html>
